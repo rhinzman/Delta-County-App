@@ -219,11 +219,9 @@ class DeltaCountyApp {
         if (!DeltaCountyConfig.ui.showInfoPanel) return;
         
         const content = this.infoPanel.querySelector('.panel-content');
-        const header = this.infoPanel.querySelector('.panel-header h3');
-        
-        header.textContent = `${layerConfig.name} Details`;
         
         let html = '<div class="feature-details">';
+        html += `<h4>${layerConfig.name} Details</h4>`;
         Object.keys(properties).forEach(key => {
             if (properties[key] !== null && properties[key] !== '') {
                 const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
@@ -267,6 +265,8 @@ class DeltaCountyApp {
             // Update layer control to include Delta County layers
             if (deltaLayers.length > 0) {
                 this.updateLayerControlWithDeltaLayers(deltaLayers);
+                // Update legend to include new layers
+                this.updateLegend();
             }
             
             // Now that layers are loaded, add the township selector if it should be shown
@@ -317,6 +317,8 @@ class DeltaCountyApp {
             // Update layer control to include UW-Madison layers
             if (uwLayers.length > 0) {
                 this.updateLayerControlWithUWLayers(uwLayers);
+                // Update legend to include new layers
+                this.updateLegend();
             }
             
         } catch (error) {
@@ -481,12 +483,43 @@ class DeltaCountyApp {
         
         legend.onAdd = (map) => {
             const div = L.DomUtil.create('div', 'legend');
-            div.innerHTML = '<h4>Legend</h4>';
+            div.innerHTML = '<h4>Map Layers</h4>';
             
+            // Add Delta County layers
+            if (this.deltaCountyService && this.deltaCountyService.layers) {
+                this.deltaCountyService.layers.forEach(layerConfig => {
+                    if (layerConfig.visible && layerConfig.leafletLayer) {
+                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#2E86AB';
+                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>${layerConfig.name}</span><br>`;
+                    }
+                });
+            }
+            
+            // Add UW-Madison layers
+            if (this.uwMadisonService && this.uwMadisonService.layers) {
+                this.uwMadisonService.layers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer) {
+                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#A23B72';
+                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>🏛️ ${layerConfig.name}</span><br>`;
+                    }
+                });
+            }
+            
+            // Add any manual layers from UW service
+            if (this.uwMadisonService && this.uwMadisonService.manualLayers) {
+                this.uwMadisonService.manualLayers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer) {
+                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#F18F01';
+                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>🏛️ ${layerConfig.name}</span><br>`;
+                    }
+                });
+            }
+            
+            // Add any other layers from the original config
             DeltaCountyConfig.layers.forEach(layerConfig => {
                 if (layerConfig.visible) {
-                    const color = layerConfig.style.color || '#85929E';
-                    div.innerHTML += `<i style="background: ${color}"></i><span>${layerConfig.name}</span><br>`;
+                    const color = layerConfig.style?.color || '#85929E';
+                    div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>${layerConfig.name}</span><br>`;
                 }
             });
             
@@ -494,6 +527,19 @@ class DeltaCountyApp {
         };
         
         legend.addTo(this.map);
+        
+        // Store legend reference for updates
+        this.legend = legend;
+    }
+    
+    updateLegend() {
+        // Remove existing legend
+        if (this.legend) {
+            this.map.removeControl(this.legend);
+        }
+        
+        // Re-add legend with current layers
+        this.addLegend();
     }
     
     addTownshipSelector() {
