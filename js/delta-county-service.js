@@ -254,6 +254,19 @@ class DeltaCountyServiceManager {
     addLayersToMap() {
         console.log(`Adding ${this.layers.length} Delta County layers to map`);
 
+        // Check if Esri Leaflet is available
+        if (typeof L === 'undefined' || typeof L.esri === 'undefined') {
+            console.error('❌ Esri Leaflet library is not available!');
+            console.log('🔧 Please ensure Esri Leaflet is properly loaded before initializing layers');
+            
+            // Create error notification layers
+            this.layers.forEach(layerConfig => {
+                layerConfig.leafletLayer = L.layerGroup();
+                layerConfig.error = 'Esri Leaflet library not loaded';
+            });
+            return;
+        }
+
         this.layers.forEach(layerConfig => {
             try {
                 // Skip placeholder layers that don't have real URLs
@@ -263,9 +276,21 @@ class DeltaCountyServiceManager {
                     return;
                 }
 
+                console.log(`🔧 Creating Esri feature layer for: ${layerConfig.name}`);
+                console.log(`   URL: ${layerConfig.url}`);
+
                 const layer = L.esri.featureLayer({
                     url: layerConfig.url,
                     style: layerConfig.style
+                });
+
+                // Add error handling for layer loading
+                layer.on('error', function(error) {
+                    console.error(`❌ Failed to load layer ${layerConfig.name}:`, error);
+                });
+
+                layer.on('load', function() {
+                    console.log(`✅ Successfully loaded layer: ${layerConfig.name}`);
                 });
 
                 // Add popup functionality
@@ -279,11 +304,16 @@ class DeltaCountyServiceManager {
                 // Add to map if visible
                 if (layerConfig.visible) {
                     layer.addTo(this.map);
+                    console.log(`🗺️ Added visible layer to map: ${layerConfig.name}`);
                 }
 
-                console.log(`✓ Added layer: ${layerConfig.name}`);
+                console.log(`✓ Configured layer: ${layerConfig.name}`);
             } catch (error) {
                 console.error(`✗ Failed to add layer ${layerConfig.name}:`, error);
+                
+                // Create a fallback layer group
+                layerConfig.leafletLayer = L.layerGroup();
+                layerConfig.error = error.message;
             }
         });
     }

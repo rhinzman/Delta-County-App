@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esri Library Test</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        #map { height: 400px; width: 100%; margin: 20px 0; border: 2px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Esri Leaflet Library Test</h1>
+    
+    <div id="test-results">
+        <div class="test-result info">
+            <strong>🔄 Testing library loading...</strong>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+    
+    <h3>📋 Test Details</h3>
+    <div id="details"></div>
+
+    <!-- Load libraries in correct order -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+    
+    <script>
+        function addResult(message, type) {
+            const results = document.getElementById('test-results');
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        function addDetail(message) {
+            const details = document.getElementById('details');
+            const p = document.createElement('p');
+            p.innerHTML = message;
+            details.appendChild(p);
+        }
+
+        // Test 1: Check if Leaflet is loaded
+        if (typeof L !== 'undefined') {
+            addResult('✅ Leaflet library loaded successfully', 'success');
+            addDetail(`📍 Leaflet version: ${L.version || 'Unknown'}`);
+        } else {
+            addResult('❌ Leaflet library failed to load', 'error');
+        }
+
+        // Test 2: Check if Esri Leaflet is loaded
+        setTimeout(() => {
+            if (typeof L !== 'undefined' && typeof L.esri !== 'undefined') {
+                addResult('✅ Esri Leaflet loaded successfully', 'success');
+                addDetail('🔧 L.esri object available');
+                addDetail('🌐 featureLayer method: ' + (typeof L.esri.featureLayer === 'function' ? 'Available' : 'Not found'));
+                
+                // Test 3: Try to create a map
+                try {
+                    const map = L.map('map').setView([45.87, -87.0], 9);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                    addResult('✅ Map created successfully', 'success');
+                    
+                    // Test 4: Try to create an Esri feature layer
+                    try {
+                        const testLayer = L.esri.featureLayer({
+                            url: 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer/7'
+                        });
+                        addResult('✅ Esri FeatureLayer created successfully', 'success');
+                        addDetail('🎯 Ready to load Delta County service');
+                        
+                        // Add the test layer to map
+                        testLayer.addTo(map);
+                        addResult('✅ Test layer added to map', 'success');
+                        
+                        testLayer.on('load', function() {
+                            addResult('✅ Test layer data loaded successfully', 'success');
+                        });
+                        
+                        testLayer.on('error', function(error) {
+                            addResult('⚠️ Test layer had loading issues: ' + error.message, 'error');
+                        });
+                        
+                    } catch (layerError) {
+                        addResult('❌ Failed to create Esri FeatureLayer: ' + layerError.message, 'error');
+                    }
+                } catch (mapError) {
+                    addResult('❌ Failed to create map: ' + mapError.message, 'error');
+                }
+            } else {
+                addResult('❌ Esri Leaflet failed to load', 'error');
+                addDetail('🔧 L.esri object not found');
+                
+                if (typeof L === 'undefined') {
+                    addDetail('❌ Leaflet itself is not loaded');
+                } else {
+                    addDetail('✅ Leaflet is loaded but Esri extension is missing');
+                }
+            }
+        }, 1000);
+
+        // Show loading times
+        window.addEventListener('load', function() {
+            addDetail('⏱️ Page load completed at: ' + new Date().toLocaleTimeString());
+        });
+    </script>
+</body>
+</html>

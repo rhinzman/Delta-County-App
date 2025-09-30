@@ -61,19 +61,43 @@
     <!-- Leaflet Providers JavaScript -->
     <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
     
-    <!-- Esri Leaflet -->
-    <script src="https://unpkg.com/esri-leaflet@3.0.10/dist/esri-leaflet.js" 
-            integrity="sha512-acTNs+OaIlzYk1qtOymCfIh1uh7xNzCfKYlzXDsGa0bCBpAOBRwqY4ZzCi8/Gcn+H3oXwHQT3/8j9YY0dq8Tuw==" 
-            crossorigin=""></script>
+    <!-- Esri Leaflet - Try multiple CDNs for reliability -->
+    <script src="https://cdn.jsdelivr.net/npm/esri-leaflet@3.0.12/dist/esri-leaflet.js" 
+            onerror="console.log('Primary CDN failed, trying backup...'); this.onerror=null; this.src='https://unpkg.com/esri-leaflet@3.0.12/dist/esri-leaflet.js';"></script>
     
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js" 
             integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" 
             crossorigin="anonymous"></script>
     
+    <!-- Error Checking and Library Validation -->
+    <script>
+        // Check if required libraries are loaded
+        window.addEventListener('load', function() {
+            const checks = {
+                'Leaflet': typeof L !== 'undefined',
+                'Esri Leaflet': typeof L !== 'undefined' && typeof L.esri !== 'undefined',
+                'Leaflet Providers': typeof L !== 'undefined' && typeof L.tileLayer.provider !== 'undefined'
+            };
+            
+            console.log('📚 Library Loading Status:');
+            Object.keys(checks).forEach(lib => {
+                const status = checks[lib] ? '✅' : '❌';
+                console.log(`   ${status} ${lib}: ${checks[lib] ? 'Loaded' : 'Failed'}`);
+            });
+            
+            if (!checks['Esri Leaflet']) {
+                console.error('❌ Esri Leaflet failed to load! Check console for network errors.');
+                alert('Error: Esri Leaflet library failed to load. Please check your internet connection.');
+            }
+        });
+    </script>
+    
     <!-- Custom JavaScript -->
     <script src="js/config.js"></script>
     <script src="js/delta-county-service.js"></script>
+    <script src="js/delta-county-fallback.js"></script>
+    <script src="js/uw-madison-service.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

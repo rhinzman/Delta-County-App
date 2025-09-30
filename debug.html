@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Delta County GIS App</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        #debug-map {
+            height: 500px;
+            width: 100%;
+            border: 2px solid #ccc;
+        }
+        .debug-info {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug - Delta County GIS App</h1>
+    
+    <div class="debug-info">
+        <h3>Library Status:</h3>
+        <div id="library-status"></div>
+    </div>
+    
+    <div class="debug-info">
+        <h3>Console Output:</h3>
+        <div id="console-output"></div>
+    </div>
+    
+    <div id="debug-map"></div>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
+    
+    <!-- Esri Leaflet -->
+    <script src="https://cdn.jsdelivr.net/npm/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+    
+    <script>
+        // Override console.log to capture output
+        const originalLog = console.log;
+        const outputDiv = document.getElementById('console-output');
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const p = document.createElement('p');
+            p.textContent = args.join(' ');
+            outputDiv.appendChild(p);
+        };
+        
+        // Check library status
+        window.addEventListener('load', function() {
+            const statusDiv = document.getElementById('library-status');
+            const checks = {
+                'Leaflet': typeof L !== 'undefined',
+                'Esri Leaflet': typeof L !== 'undefined' && typeof L.esri !== 'undefined'
+            };
+            
+            Object.keys(checks).forEach(lib => {
+                const status = checks[lib] ? '✅ Loaded' : '❌ Failed';
+                const p = document.createElement('p');
+                p.textContent = `${lib}: ${status}`;
+                statusDiv.appendChild(p);
+            });
+            
+            // Try to create a simple map
+            try {
+                console.log('Creating basic map...');
+                const map = L.map('debug-map').setView([45.7, -87.1], 10);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+                
+                console.log('✅ Basic map created successfully');
+                
+                // Test Delta County service
+                if (typeof L.esri !== 'undefined') {
+                    console.log('Testing Delta County service...');
+                    fetch('https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer?f=json')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('✅ Delta County service accessible');
+                            console.log('Layers found:', data.layers?.length || 0);
+                        })
+                        .catch(error => {
+                            console.log('❌ Delta County service error:', error.message);
+                        });
+                } else {
+                    console.log('❌ Esri Leaflet not available for service test');
+                }
+                
+            } catch (error) {
+                console.log('❌ Map creation failed:', error.message);
+            }
+        });
+    </script>
+</body>
+</html>

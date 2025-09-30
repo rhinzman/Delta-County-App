@@ -9,8 +9,9 @@ class DeltaCountyApp {
         this.loadingIndicator = document.getElementById('loading-indicator');
         this.infoPanel = document.getElementById('info-panel');
         this.layersLoaded = 0;
-        this.totalLayers = DeltaCountyConfig.layers.length;
+        this.totalLayers = 0; // Will be set when services load
         this.deltaCountyServiceManager = null;
+        this.uwMadisonServiceManager = null;
         
         this.init();
     }
@@ -20,6 +21,7 @@ class DeltaCountyApp {
         this.setupEventListeners();
         this.loadLayers();
         this.initializeDeltaCountyService();
+        this.initializeUWMadisonService();
         this.setupControls();
     }
     
@@ -70,15 +72,32 @@ class DeltaCountyApp {
     }
     
     loadLayers() {
-        this.showLoading();
+        // Skip loading config layers since we're using Delta County Service Manager
+        console.log('Config layers skipped - using Delta County Service Manager instead');
         
-        DeltaCountyConfig.layers.forEach(layerConfig => {
-            this.addLayer(layerConfig);
-        });
+        // If there are any legacy layers in config, load them
+        if (DeltaCountyConfig.layers && DeltaCountyConfig.layers.length > 0) {
+            this.showLoading();
+            this.totalLayers = DeltaCountyConfig.layers.length;
+            
+            DeltaCountyConfig.layers.forEach(layerConfig => {
+                this.addLayer(layerConfig);
+            });
+        } else {
+            // No config layers to load - hide loading immediately
+            this.hideLoading();
+        }
     }
     
     addLayer(layerConfig) {
         try {
+            // Skip layers that require Esri Leaflet if it's not available
+            if (typeof L.esri === 'undefined') {
+                console.log(`Skipping ${layerConfig.name} - Esri Leaflet not available`);
+                this.onLayerLoaded(); // Count as loaded
+                return;
+            }
+            
             const layerOptions = {
                 url: layerConfig.url,
                 style: layerConfig.style
@@ -217,6 +236,25 @@ class DeltaCountyApp {
     
     async initializeDeltaCountyService() {
         console.log('Initializing Delta County Service...');
+        this.showLoading();
+        
+        // Check if Esri Leaflet is available
+        if (typeof L === 'undefined') {
+            console.error('❌ Leaflet library is not loaded!');
+            this.hideLoading();
+            return;
+        }
+        
+        if (typeof L.esri === 'undefined') {
+            console.error('❌ Esri Leaflet library is not loaded!');
+            console.log('🔧 Waiting 2 seconds and retrying...');
+            
+            // Wait a bit and try again in case the library is still loading
+            setTimeout(() => {
+                this.retryDeltaCountyService();
+            }, 2000);
+            return;
+        }
         
         try {
             this.deltaCountyServiceManager = new DeltaCountyServiceManager(this.map);
@@ -228,8 +266,114 @@ class DeltaCountyApp {
             if (deltaLayers.length > 0) {
                 this.updateLayerControlWithDeltaLayers(deltaLayers);
             }
+            
+            this.hideLoading();
         } catch (error) {
             console.error('Failed to initialize Delta County Service:', error);
+            this.hideLoading();
+        }
+    }
+    
+    async initializeUWMadisonService() {
+        console.log('🏛️ Initializing UW-Madison Service...');
+        
+        // Check if Esri Leaflet is available
+        if (typeof L === 'undefined') {
+            console.error('❌ Leaflet library is not loaded!');
+            return;
+        }
+        
+        if (typeof L.esri === 'undefined') {
+            console.error('❌ Esri Leaflet library is not loaded!');
+            console.log('🔧 Will retry UW-Madison service after Esri loads...');
+            
+            // Wait for Esri to load and try again
+            setTimeout(() => {
+                this.retryUWMadisonService();
+            }, 3000);
+            return;
+        }
+        
+        try {
+            // Check if UWMadisonServiceManager is available
+            if (typeof UWMadisonServiceManager === 'undefined') {
+                console.error('❌ UWMadisonServiceManager not loaded!');
+                return;
+            }
+            
+            this.uwMadisonServiceManager = new UWMadisonServiceManager(this.map);
+            const uwLayers = await this.uwMadisonServiceManager.initialize();
+            
+            console.log(`✅ Successfully integrated ${uwLayers.length} UW-Madison layers`);
+            
+            // Update layer control to include UW-Madison layers
+            if (uwLayers.length > 0) {
+                this.updateLayerControlWithUWLayers(uwLayers);
+            }
+            
+        } catch (error) {
+            console.error('❌ Failed to initialize UW-Madison Service:', error);
+        }
+    }
+    
+    async retryUWMadisonService() {
+        console.log('🔄 Retrying UW-Madison Service initialization...');
+        
+        if (typeof L.esri !== 'undefined') {
+            console.log('✅ Esri Leaflet now available, proceeding with UW-Madison initialization');
+            this.initializeUWMadisonService();
+        } else {
+            console.error('❌ Esri Leaflet still not available for UW-Madison service');
+        }
+    }
+    
+    updateLayerControlWithUWLayers(uwLayers) {
+        // Add UW-Madison layers to the existing layer control
+        setTimeout(() => {
+            if (this.layerControl) {
+                uwLayers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer) {
+                        this.layerControl.addOverlay(
+                            layerConfig.leafletLayer, 
+                            `🏛️ ${layerConfig.name}`
+                        );
+                    }
+                });
+                console.log(`📋 Added ${uwLayers.length} UW-Madison layers to layer control`);
+            }
+        }, 1500); // Delay to ensure layer control is ready
+    }
+
+    async retryDeltaCountyService() {
+        console.log('🔄 Retrying Delta County Service initialization...');
+        
+        if (typeof L.esri !== 'undefined') {
+            console.log('✅ Esri Leaflet now available, proceeding with initialization');
+            this.initializeDeltaCountyService();
+        } else {
+            console.error('❌ Esri Leaflet still not available after retry');
+            console.log('� Switching to fallback GeoJSON service...');
+            
+            // Try fallback service
+            if (typeof DeltaCountyFallbackService !== 'undefined') {
+                try {
+                    this.deltaCountyServiceManager = new DeltaCountyFallbackService(this.map);
+                    const deltaLayers = await this.deltaCountyServiceManager.initialize();
+                    
+                    console.log(`✅ Fallback service loaded ${deltaLayers.length} layers`);
+                    
+                    if (deltaLayers.length > 0) {
+                        this.updateLayerControlWithDeltaLayers(deltaLayers);
+                    }
+                } catch (error) {
+                    console.error('❌ Fallback service also failed:', error);
+                }
+            } else {
+                console.log('📋 Troubleshooting steps:');
+                console.log('   1. Check internet connection');
+                console.log('   2. Verify CDN availability');
+                console.log('   3. Check browser console for network errors');
+            }
         }
     }
     
@@ -433,24 +577,29 @@ class DeltaCountyApp {
 
 // Initialize the application when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 DOM Content Loaded - Starting Delta County App');
+    
     // Check if required libraries are loaded
     if (typeof L === 'undefined') {
-        console.error('Leaflet library not loaded');
+        console.error('❌ Leaflet library not loaded');
         return;
-    }
-    
-    if (typeof L.esri === 'undefined') {
-        console.error('Esri Leaflet library not loaded');
-        return;
+    } else {
+        console.log('✅ Leaflet library loaded');
     }
     
     if (typeof DeltaCountyConfig === 'undefined') {
-        console.error('Configuration not loaded');
+        console.error('❌ Configuration not loaded');
         return;
+    } else {
+        console.log('✅ DeltaCountyConfig loaded');
     }
     
-    // Initialize the application
+    console.log('✅ All dependencies loaded, initializing app...');
+    
+    // Initialize the application (Esri Leaflet check moved to layer loading)
     window.deltaCountyApp = new DeltaCountyApp();
+    
+    console.log('✅ DeltaCountyApp instance created');
 });
 
 // Export for potential use in other scripts
