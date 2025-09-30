@@ -10,7 +10,7 @@ class DeltaCountyApp {
         this.infoPanel = document.getElementById('info-panel');
         this.layersLoaded = 0;
         this.totalLayers = DeltaCountyConfig.layers.length;
-        this.uwMadisonLayerManager = null;
+        this.deltaCountyServiceManager = null;
         
         this.init();
     }
@@ -19,7 +19,7 @@ class DeltaCountyApp {
         this.createMap();
         this.setupEventListeners();
         this.loadLayers();
-        this.initializeUWMadisonLayers();
+        this.initializeDeltaCountyService();
         this.setupControls();
     }
     
@@ -215,31 +215,30 @@ class DeltaCountyApp {
         this.infoPanel.classList.add('active');
     }
     
-    async initializeUWMadisonLayers() {
-        console.log('Initializing UW-Madison layers...');
+    async initializeDeltaCountyService() {
+        console.log('Initializing Delta County Service...');
         
         try {
-            this.uwMadisonLayerManager = new UWMadisonLayerManager(this.map);
-            const uwLayers = await this.uwMadisonLayerManager.initialize();
+            this.deltaCountyServiceManager = new DeltaCountyServiceManager(this.map);
+            const deltaLayers = await this.deltaCountyServiceManager.initialize();
             
-            console.log(`Successfully added ${uwLayers.length} UW-Madison layers`);
+            console.log(`Successfully integrated ${deltaLayers.length} Delta County layers`);
             
-            // Update layer control to include UW-Madison layers
-            if (uwLayers.length > 0) {
-                this.updateLayerControlWithUWLayers(uwLayers);
+            // Update layer control to include Delta County layers
+            if (deltaLayers.length > 0) {
+                this.updateLayerControlWithDeltaLayers(deltaLayers);
             }
         } catch (error) {
-            console.error('Failed to initialize UW-Madison layers:', error);
-            console.log('Please check the service URLs in uw-madison-layers.js');
+            console.error('Failed to initialize Delta County Service:', error);
         }
     }
     
-    updateLayerControlWithUWLayers(uwLayers) {
+    updateLayerControlWithDeltaLayers(deltaLayers) {
         // This will be called after the regular layer control is set up
-        // We'll add the UW-Madison layers to the existing control
+        // We'll add the Delta County layers to the existing control
         setTimeout(() => {
             if (this.layerControl) {
-                uwLayers.forEach(layerConfig => {
+                deltaLayers.forEach(layerConfig => {
                     if (layerConfig.leafletLayer) {
                         this.layerControl.addOverlay(layerConfig.leafletLayer, layerConfig.name);
                     }

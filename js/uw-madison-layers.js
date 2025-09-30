@@ -1,68 +1,181 @@
-// UW-Madison Layer Discovery and Integration
-// This module handles adding layers from UW-Madison ArcGIS services
+// Delta County Layer Discovery and Integration
+// This module handles adding layers from your Delta County ArcGIS service
 
-class UWMadisonLayerManager {
+class DeltaCountyLayerManager {
     constructor(map) {
         this.map = map;
-        this.itemIds = [
-            '16a040a49b1b46bba29922a712e32ebb', // Original item
-            '18855e2cb43a4c7aa6212f1692b35d7d'  // New layer from map viewer
-        ];
-        this.baseUrl = 'https://uw-mad.maps.arcgis.com';
-        this.serviceUrls = [];
+        this.serviceUrl = 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer';
+        this.itemId = '18855e2cb43a4c7aa6212f1692b35d7d';
         this.layers = [];
     }
 
-    async discoverServiceUrls() {
-        console.log('🔍 Testing multiple UW-Madison layer IDs...');
+    async loadDeltaCountyService() {
+        console.log('🏛️ Loading Delta County GIS Service...');
+        console.log(`📍 Service URL: ${this.serviceUrl}`);
         
-        // First, check if manual configurations are available
-        await this.checkManualConfigurations();
-        
-        // Then try automatic discovery
-        for (const itemId of this.itemIds) {
-            console.log(`\n📍 Testing Item ID: ${itemId}`);
-            await this.testServicePatternsForItem(itemId);
-        }
-
-        if (this.serviceUrls.length === 0) {
-            console.warn('⚠️ No UW-Madison services found with standard URL patterns');
-            this.tryFallbackApproach();
+        try {
+            const response = await fetch(`${this.serviceUrl}?f=json`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const serviceData = await response.json();
+            
+            if (serviceData.error) {
+                throw new Error(`Service Error: ${serviceData.error.message}`);
+            }
+            
+            if (serviceData.layers && serviceData.layers.length > 0) {
+                console.log(`✅ Successfully connected to Delta County service`);
+                console.log(`📊 Found ${serviceData.layers.length} layers:`);
+                serviceData.layers.forEach(layer => {
+                    console.log(`   • ${layer.name} (ID: ${layer.id}, Type: ${layer.geometryType})`);
+                });
+                
+                await this.processService(serviceData);
+                return true;
+            } else {
+                throw new Error('No layers found in service');
+            }
+        } catch (error) {
+            console.error('❌ Failed to load Delta County service:', error.message);
+            this.createFallbackLayer();
+            return false;
         }
     }
 
-    async checkManualConfigurations() {
-        if (typeof UWMadisonManualConfig !== 'undefined') {
-            console.log('🔧 Checking manual configurations...');
-            const manualConfigs = UWMadisonManualConfig.createLayerConfigs();
-            
-            if (manualConfigs.length > 0) {
-                console.log(`Found ${manualConfigs.length} manually configured services`);
-                
-                for (const config of manualConfigs) {
-                    try {
-                        console.log(`Testing manual service: ${config.serviceUrl}`);
-                        const url = config.authToken ? 
-                            `${config.serviceUrl}?f=json&token=${config.authToken}` : 
-                            `${config.serviceUrl}?f=json`;
-                            
-                        const response = await fetch(url);
-                        if (response.ok) {
-                            const data = await response.json();
-                            if (data.layers && data.layers.length > 0) {
-                                console.log(`✅ Manual service working: ${config.name}`);
-                                this.serviceUrls.push(config.serviceUrl);
-                                await this.processService(config.serviceUrl, data, config.itemId);
-                            }
-                        }
-                    } catch (error) {
-                        console.warn(`❌ Manual service failed: ${config.name} - ${error.message}`);
-                    }
-                }
-            } else {
-                console.log('No enabled manual configurations found');
+    async processService(serviceData) {
+        console.log('🔧 Processing Delta County service layers...');
+
+        // Create layer configurations for each layer in the service
+        serviceData.layers.forEach(layerInfo => {
+            const layerConfig = {
+                id: `delta_county_${layerInfo.id}`,
+                name: this.formatLayerName(layerInfo.name),
+                url: `${this.serviceUrl}/${layerInfo.id}`,
+                type: 'featureLayer',
+                visible: this.shouldBeVisibleByDefault(layerInfo),
+                style: this.getStyleForLayer(layerInfo),
+                popupTemplate: this.createPopupTemplate(layerInfo),
+                layerInfo: layerInfo,
+                sourceService: 'Delta County GIS'
+            };
+
+            this.layers.push(layerConfig);
+            console.log(`📋 Configured layer: ${layerConfig.name}`);
+        });
+    }
+
+    formatLayerName(name) {
+        // Clean up layer names for better display
+        const nameMap = {
+            'Site_Structure_Address_Points_Delta_County': '🏠 Address Points',
+            'Road_Centerlines_Delta_County': '🛣️ Roads',
+            'parcels': '📐 Parcels',
+            'Townships': '🏘️ Townships'
+        };
+        
+        return nameMap[name] || `📍 ${name.replace(/_/g, ' ')}`;
+    }
+
+    shouldBeVisibleByDefault(layerInfo) {
+        // Show some layers by default
+        const defaultVisible = ['Townships', 'parcels'];
+        return defaultVisible.includes(layerInfo.name);
+    }
+
+    getStyleForLayer(layerInfo) {
+        // Custom styles for each layer type
+        const styles = {
+            'Townships': {
+                color: '#2E86AB',
+                weight: 2,
+                fillColor: '#A23B72',
+                fillOpacity: 0.1,
+                opacity: 0.8
+            },
+            'parcels': {
+                color: '#F18F01',
+                weight: 1,
+                fillColor: '#C73E1D',
+                fillOpacity: 0.2,
+                opacity: 0.7
+            },
+            'Site_Structure_Address_Points_Delta_County': {
+                radius: 5,
+                fillColor: '#3F612D',
+                color: '#000',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
+            },
+            'Road_Centerlines_Delta_County': {
+                color: '#231F20',
+                weight: 2,
+                opacity: 0.8
             }
-        }
+        };
+        
+        return styles[layerInfo.name] || this.getDefaultStyle(layerInfo.geometryType);
+    }
+
+    createPopupTemplate(layerInfo) {
+        // Create appropriate popup templates for each layer
+        const templates = {
+            'Townships': {
+                title: '🏘️ {NAME}',
+                content: `
+                    <div style="padding: 10px; font-family: Arial, sans-serif;">
+                        <h4 style="margin-top: 0; color: #2E86AB;">Township Information</h4>
+                        <p><strong>Name:</strong> {NAME}</p>
+                        <p><strong>Type:</strong> {TYPE}</p>
+                        <p><strong>County:</strong> Delta County, Michigan</p>
+                    </div>
+                `
+            },
+            'parcels': {
+                title: '📐 Parcel {PARCEL_ID}',
+                content: `
+                    <div style="padding: 10px; font-family: Arial, sans-serif;">
+                        <h4 style="margin-top: 0; color: #F18F01;">Property Information</h4>
+                        <p><strong>Parcel ID:</strong> {PARCEL_ID}</p>
+                        <p><strong>Owner:</strong> {OWNER_NAME}</p>
+                        <p><strong>Address:</strong> {SITE_ADDR}</p>
+                        <p><strong>Township:</strong> {TOWNSHIP}</p>
+                        <p><strong>Acreage:</strong> {ACRES}</p>
+                    </div>
+                `
+            },
+            'Site_Structure_Address_Points_Delta_County': {
+                title: '🏠 {FULL_ADDRESS}',
+                content: `
+                    <div style="padding: 10px; font-family: Arial, sans-serif;">
+                        <h4 style="margin-top: 0; color: #3F612D;">Address Information</h4>
+                        <p><strong>Address:</strong> {FULL_ADDRESS}</p>
+                        <p><strong>City:</strong> {CITY}</p>
+                        <p><strong>State:</strong> {STATE}</p>
+                        <p><strong>ZIP:</strong> {ZIP}</p>
+                    </div>
+                `
+            },
+            'Road_Centerlines_Delta_County': {
+                title: '🛣️ {ROAD_NAME}',
+                content: `
+                    <div style="padding: 10px; font-family: Arial, sans-serif;">
+                        <h4 style="margin-top: 0; color: #231F20;">Road Information</h4>
+                        <p><strong>Road Name:</strong> {ROAD_NAME}</p>
+                        <p><strong>Type:</strong> {ROAD_TYPE}</p>
+                        <p><strong>Surface:</strong> {SURFACE}</p>
+                    </div>
+                `
+            }
+        };
+        
+        return templates[layerInfo.name] || {
+            title: layerInfo.name,
+            content: 'Click for feature details...'
+        };
     }
 
     async testServicePatternsForItem(itemId) {
@@ -353,14 +466,11 @@ class UWMadisonLayerManager {
     }
 
     async initialize() {
-        console.log('🏛️ Initializing UW-Madison Layer Manager...');
-        console.log(`📍 Target Item IDs:`);
-        this.itemIds.forEach((itemId, index) => {
-            console.log(`   ${index + 1}. ${itemId}`);
-        });
-        console.log(`🔗 Base URL: ${this.baseUrl}`);
+        console.log('🏛️ Initializing Delta County Layer Manager...');
+        console.log(`📍 Service: Delta County GIS`);
+        console.log(`🔗 URL: ${this.serviceUrl}`);
         
-        await this.discoverServiceUrls();
+        const success = await this.loadDeltaCountyService();
         this.addLayersToMap();
         
         // Create summary
