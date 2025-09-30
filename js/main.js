@@ -10,6 +10,7 @@ class DeltaCountyApp {
         this.infoPanel = document.getElementById('info-panel');
         this.layersLoaded = 0;
         this.totalLayers = DeltaCountyConfig.layers.length;
+        this.uwMadisonLayerManager = null;
         
         this.init();
     }
@@ -18,6 +19,7 @@ class DeltaCountyApp {
         this.createMap();
         this.setupEventListeners();
         this.loadLayers();
+        this.initializeUWMadisonLayers();
         this.setupControls();
     }
     
@@ -213,6 +215,39 @@ class DeltaCountyApp {
         this.infoPanel.classList.add('active');
     }
     
+    async initializeUWMadisonLayers() {
+        console.log('Initializing UW-Madison layers...');
+        
+        try {
+            this.uwMadisonLayerManager = new UWMadisonLayerManager(this.map);
+            const uwLayers = await this.uwMadisonLayerManager.initialize();
+            
+            console.log(`Successfully added ${uwLayers.length} UW-Madison layers`);
+            
+            // Update layer control to include UW-Madison layers
+            if (uwLayers.length > 0) {
+                this.updateLayerControlWithUWLayers(uwLayers);
+            }
+        } catch (error) {
+            console.error('Failed to initialize UW-Madison layers:', error);
+            console.log('Please check the service URLs in uw-madison-layers.js');
+        }
+    }
+    
+    updateLayerControlWithUWLayers(uwLayers) {
+        // This will be called after the regular layer control is set up
+        // We'll add the UW-Madison layers to the existing control
+        setTimeout(() => {
+            if (this.layerControl) {
+                uwLayers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer) {
+                        this.layerControl.addOverlay(layerConfig.leafletLayer, layerConfig.name);
+                    }
+                });
+            }
+        }, 1000); // Small delay to ensure layer control is ready
+    }
+    
     setupControls() {
         // Setup layer control
         if (DeltaCountyConfig.ui.showLayerControl) {
@@ -238,7 +273,7 @@ class DeltaCountyApp {
             overlayMaps[layerData.config.name] = layerData.layer;
         });
         
-        L.control.layers(this.baseMaps, overlayMaps, {
+        this.layerControl = L.control.layers(this.baseMaps, overlayMaps, {
             position: 'topright',
             collapsed: false
         }).addTo(this.map);
