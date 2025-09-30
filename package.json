@@ -1,0 +1,38 @@
+{
+  "name": "delta-county-app",
+  "version": "1.0.0",
+  "description": "Interactive GIS web application for Delta County, Michigan",
+  "main": "index.html",
+  "scripts": {
+    "start": "http-server -p 8080 -c-1",
+    "dev": "http-server -p 8080 -c-1 -o",
+    "build": "echo 'No build step required for static site'",
+    "test": "echo 'No tests specified'"
+  },
+  "keywords": [
+    "gis",
+    "mapping",
+    "leaflet",
+    "esri",
+    "delta-county",
+    "michigan",
+    "parcels",
+    "interactive-map"
+  ],
+  "author": "Delta County GIS Team",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/delta-county-app.git"
+  },
+  "homepage": "https://yourusername.github.io/delta-county-app",
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
