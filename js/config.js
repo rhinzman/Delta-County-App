@@ -13,12 +13,12 @@ const DeltaCountyConfig = {
     // Base map configurations
     baseMaps: {
         'Dark Theme': {
-            layer: 'Stadia.AlidadeSmoothDark',
-            attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://openmaptiles.org/">OpenMapTiles</a> &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+            layer: 'CartoDB.DarkMatter',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         },
         'Terrain': {
-            layer: 'Stadia.StamenTerrain',
-            attribution: '&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>, &copy; <a href="https://stamen.com">Stamen Design</a>, &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+            layer: 'OpenTopoMap',
+            attribution: 'Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
         },
         'Street Map': {
             layer: 'OpenStreetMap.Mapnik',

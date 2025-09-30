@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Township Debug - Delta County GIS</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <!-- Leaflet Providers CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.css"/>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <style>
+        body { 
+            margin: 0; 
+            padding: 20px; 
+            font-family: Arial, sans-serif; 
+            background: #f5f5f5;
+        }
+        .debug-container {
+            display: flex;
+            gap: 20px;
+        }
+        .debug-panel {
+            width: 300px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .debug-map {
+            flex: 1;
+            height: 600px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .log-info { background: #d4edda; }
+        .log-warn { background: #fff3cd; }
+        .log-error { background: #f8d7da; }
+        .test-button {
+            margin: 5px 0;
+            padding: 8px 15px;
+            background: #2E86AB;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .test-button:hover { background: #1a5f7a; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Township Loading Debug</h1>
+    
+    <div class="debug-container">
+        <div class="debug-panel">
+            <h3>Debug Console</h3>
+            <div id="debug-log"></div>
+            
+            <h3>Test Controls</h3>
+            <button class="test-button" onclick="testServiceConnection()">Test Delta County Service</button>
+            <button class="test-button" onclick="testTownshipLayer()">Find Township Layer</button>
+            <button class="test-button" onclick="testTownshipQuery()">Test Township Query</button>
+            <button class="test-button" onclick="listAllLayers()">List All Layers</button>
+            <button class="test-button" onclick="clearLog()">Clear Log</button>
+            
+            <h3>Township Selector Test</h3>
+            <select id="township-test" onchange="testTownshipSelection(this.value)">
+                <option value="">Choose a Township</option>
+                <option value="Wells">Wells</option>
+                <option value="Bark River">Bark River</option>
+                <option value="Escanaba">Escanaba</option>
+                <option value="Gladstone">Gladstone</option>
+                <option value="Bay De Noc">Bay De Noc</option>
+                <option value="Fairbanks">Fairbanks</option>
+                <option value="Ensign">Ensign</option>
+                <option value="Brampton">Brampton</option>
+                <option value="Cornell">Cornell</option>
+            </select>
+        </div>
+        
+        <div id="debug-map" class="debug-map"></div>
+    </div>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
+    
+    <!-- Leaflet Providers JavaScript -->
+    <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+    
+    <!-- Esri Leaflet -->
+    <script src="https://cdn.jsdelivr.net/npm/esri-leaflet@3.0.12/dist/esri-leaflet.js"></script>
+    
+    <!-- Custom JavaScript -->
+    <script src="js/config.js"></script>
+    <script src="js/delta-county-service.js"></script>
+    
+    <script>
+        let debugMap;
+        let deltaCountyServiceManager;
+        let logContainer;
+        
+        function debugLog(message, type = 'info') {
+            console.log(message);
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+        
+        function clearLog() {
+            logContainer.innerHTML = '';
+        }
+        
+        window.addEventListener('load', async function() {
+            logContainer = document.getElementById('debug-log');
+            
+            debugLog('🚀 Starting township debug session');
+            
+            // Initialize map
+            debugMap = L.map('debug-map').setView([45.7, -87.1], 9);
+            L.tileLayer.provider('OpenStreetMap.Mapnik').addTo(debugMap);
+            debugLog('✅ Debug map initialized');
+            
+            // Wait for libraries to load
+            if (typeof L.esri === 'undefined') {
+                debugLog('⚠️ Esri Leaflet not loaded, waiting...', 'warn');
+                setTimeout(initializeService, 2000);
+            } else {
+                debugLog('✅ Esri Leaflet available');
+                await initializeService();
+            }
+        });
+        
+        async function initializeService() {
+            try {
+                debugLog('🏛️ Initializing Delta County Service...');
+                deltaCountyServiceManager = new DeltaCountyServiceManager(debugMap);
+                const layers = await deltaCountyServiceManager.initialize();
+                debugLog(`✅ Service initialized with ${layers.length} layers`);
+                
+                layers.forEach((layer, index) => {
+                    debugLog(`   ${index + 1}. ${layer.name} (ID: ${layer.id})`);
+                });
+                
+            } catch (error) {
+                debugLog(`❌ Service initialization failed: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testServiceConnection() {
+            debugLog('🔍 Testing service connection...');
+            
+            try {
+                const serviceUrl = 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer';
+                const response = await fetch(`${serviceUrl}?f=json`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    debugLog(`✅ Service connection successful`);
+                    debugLog(`   Service name: ${data.serviceDescription || 'N/A'}`);
+                    debugLog(`   Layers available: ${data.layers ? data.layers.length : 0}`);
+                    
+                    if (data.layers) {
+                        data.layers.forEach(layer => {
+                            debugLog(`      Layer ${layer.id}: ${layer.name} (${layer.geometryType})`);
+                        });
+                    }
+                } else {
+                    debugLog(`❌ Service connection failed: HTTP ${response.status}`, 'error');
+                }
+            } catch (error) {
+                debugLog(`❌ Service test error: ${error.message}`, 'error');
+            }
+        }
+        
+        function testTownshipLayer() {
+            debugLog('🔍 Looking for township layer...');
+            
+            if (!deltaCountyServiceManager) {
+                debugLog('❌ Service manager not initialized', 'error');
+                return;
+            }
+            
+            const townshipLayer = findTownshipLayer();
+            if (townshipLayer) {
+                debugLog(`✅ Found township layer: ${townshipLayer.name}`);
+                debugLog(`   ID: ${townshipLayer.id}`);
+                debugLog(`   Visible: ${townshipLayer.visible}`);
+                debugLog(`   Has Leaflet layer: ${!!townshipLayer.leafletLayer}`);
+                
+                if (townshipLayer.leafletLayer) {
+                    debugLog(`   Layer on map: ${debugMap.hasLayer(townshipLayer.leafletLayer)}`);
+                    
+                    // Count features
+                    let featureCount = 0;
+                    townshipLayer.leafletLayer.eachLayer(() => featureCount++);
+                    debugLog(`   Feature count: ${featureCount}`);
+                }
+            } else {
+                debugLog('❌ Township layer not found', 'error');
+                debugLog('Available layers:');
+                if (deltaCountyServiceManager.layers) {
+                    deltaCountyServiceManager.layers.forEach(layer => {
+                        debugLog(`   - ${layer.name} (${layer.id})`);
+                    });
+                }
+            }
+        }
+        
+        function findTownshipLayer() {
+            if (deltaCountyServiceManager && deltaCountyServiceManager.layers) {
+                return deltaCountyServiceManager.layers.find(layer => 
+                    layer.name && layer.name.toLowerCase().includes('township')
+                );
+            }
+            return null;
+        }
+        
+        function testTownshipQuery() {
+            debugLog('🔍 Testing township query...');
+            
+            const townshipLayer = findTownshipLayer();
+            if (!townshipLayer) {
+                debugLog('❌ No township layer found for query test', 'error');
+                return;
+            }
+            
+            if (!townshipLayer.leafletLayer) {
+                debugLog('❌ Township layer has no Leaflet layer', 'error');
+                return;
+            }
+            
+            const testTownship = 'Wells';
+            debugLog(`Testing query for township: ${testTownship}`);
+            
+            if (typeof L.esri !== 'undefined' && townshipLayer.leafletLayer.query) {
+                debugLog('Using Esri Leaflet query...');
+                
+                townshipLayer.leafletLayer.query()
+                    .where(`NAME = '${testTownship}' OR TOWN = '${testTownship}' OR TOWNSHIP = '${testTownship}'`)
+                    .run((error, featureCollection) => {
+                        if (error) {
+                            debugLog(`❌ Query error: ${error.message}`, 'error');
+                            testFallbackSearch(townshipLayer, testTownship);
+                        } else if (featureCollection && featureCollection.features) {
+                            debugLog(`✅ Query successful: found ${featureCollection.features.length} features`);
+                            featureCollection.features.forEach((feature, index) => {
+                                const props = feature.properties;
+                                const name = props.NAME || props.TOWN || props.TOWNSHIP || 'Unknown';
+                                debugLog(`   Feature ${index + 1}: ${name}`);
+                            });
+                        } else {
+                            debugLog('⚠️ Query returned no features', 'warn');
+                            testFallbackSearch(townshipLayer, testTownship);
+                        }
+                    });
+            } else {
+                debugLog('⚠️ Esri query not available, using fallback', 'warn');
+                testFallbackSearch(townshipLayer, testTownship);
+            }
+        }
+        
+        function testFallbackSearch(townshipLayer, testTownship) {
+            debugLog('🔄 Testing fallback search...');
+            
+            const matchingFeatures = [];
+            let totalFeatures = 0;
+            
+            townshipLayer.leafletLayer.eachLayer(layer => {
+                totalFeatures++;
+                if (layer.feature && layer.feature.properties) {
+                    const props = layer.feature.properties;
+                    const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
+                    
+                    debugLog(`   Checking feature: ${townshipName}`);
+                    
+                    if (townshipName.toLowerCase().includes(testTownship.toLowerCase())) {
+                        matchingFeatures.push(layer.feature);
+                        debugLog(`   ✅ Match found: ${townshipName}`);
+                    }
+                }
+            });
+            
+            debugLog(`Searched ${totalFeatures} total features`);
+            debugLog(`Found ${matchingFeatures.length} matching features`);
+        }
+        
+        function listAllLayers() {
+            debugLog('📋 Listing all available layers...');
+            
+            if (!deltaCountyServiceManager || !deltaCountyServiceManager.layers) {
+                debugLog('❌ No service manager or layers available', 'error');
+                return;
+            }
+            
+            deltaCountyServiceManager.layers.forEach((layer, index) => {
+                debugLog(`${index + 1}. ${layer.name}`);
+                debugLog(`   ID: ${layer.id}`);
+                debugLog(`   Visible: ${layer.visible}`);
+                debugLog(`   Has Leaflet Layer: ${!!layer.leafletLayer}`);
+                
+                if (layer.leafletLayer) {
+                    let featureCount = 0;
+                    layer.leafletLayer.eachLayer(() => featureCount++);
+                    debugLog(`   Features: ${featureCount}`);
+                    debugLog(`   On Map: ${debugMap.hasLayer(layer.leafletLayer)}`);
+                }
+                debugLog('   ---');
+            });
+        }
+        
+        function testTownshipSelection(township) {
+            if (!township) {
+                debugLog('🔄 Reset township selection');
+                return;
+            }
+            
+            debugLog(`🎯 Testing township selection: ${township}`);
+            
+            const townshipLayer = findTownshipLayer();
+            if (!townshipLayer) {
+                debugLog('❌ Township layer not found', 'error');
+                return;
+            }
+            
+            // Show the township layer if not visible
+            if (!debugMap.hasLayer(townshipLayer.leafletLayer)) {
+                townshipLayer.leafletLayer.addTo(debugMap);
+                debugLog('✅ Added township layer to map');
+            }
+            
+            // Test the query
+            if (typeof L.esri !== 'undefined' && townshipLayer.leafletLayer.query) {
+                townshipLayer.leafletLayer.query()
+                    .where(`NAME = '${township}' OR TOWN = '${township}' OR TOWNSHIP = '${township}'`)
+                    .run((error, featureCollection) => {
+                        if (error) {
+                            debugLog(`❌ Selection query error: ${error.message}`, 'error');
+                        } else if (featureCollection && featureCollection.features && featureCollection.features.length > 0) {
+                            debugLog(`✅ Found ${featureCollection.features.length} features for ${township}`);
+                            
+                            try {
+                                const group = L.featureGroup(featureCollection.features.map(feature => L.geoJSON(feature)));
+                                const bounds = group.getBounds();
+                                
+                                if (bounds.isValid()) {
+                                    debugMap.fitBounds(bounds, { padding: [20, 20] });
+                                    debugLog('✅ Zoomed to township bounds');
+                                } else {
+                                    debugLog('⚠️ Invalid bounds', 'warn');
+                                }
+                            } catch (error) {
+                                debugLog(`❌ Zoom error: ${error.message}`, 'error');
+                            }
+                        } else {
+                            debugLog(`⚠️ No features found for ${township}`, 'warn');
+                        }
+                    });
+            }
+        }
+    </script>
+</body>
+</html>

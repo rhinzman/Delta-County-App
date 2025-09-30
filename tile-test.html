@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tile Layer Test - Delta County GIS</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <!-- Leaflet Providers CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.css"/>
+    
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .test-map {
+            height: 300px;
+            width: 100%;
+            margin: 10px 0;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+        .test-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+        }
+        .success { background: #d4edda; border-color: #c3e6cb; }
+        .error { background: #f8d7da; border-color: #f5c6cb; }
+    </style>
+</head>
+<body>
+    <h1>🗺️ Tile Layer Provider Test</h1>
+    
+    <div class="test-info">
+        <h3>Testing Updated Base Layer Configurations</h3>
+        <p>This page tests the new tile layer providers to ensure they work without registration requirements.</p>
+    </div>
+    
+    <div class="test-info" id="test-results">
+        <h3>Test Results:</h3>
+        <div id="results-content"></div>
+    </div>
+    
+    <h3>1. CartoDB Dark Matter (Dark Theme)</h3>
+    <div id="dark-map" class="test-map"></div>
+    
+    <h3>2. OpenTopoMap (Terrain)</h3>
+    <div id="terrain-map" class="test-map"></div>
+    
+    <h3>3. OpenStreetMap Mapnik (Street Map)</h3>
+    <div id="street-map" class="test-map"></div>
+    
+    <h3>4. Esri World Imagery (Satellite)</h3>
+    <div id="satellite-map" class="test-map"></div>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
+    
+    <!-- Leaflet Providers JavaScript -->
+    <script src="https://unpkg.com/leaflet-providers@1.13.0/leaflet-providers.js"></script>
+    
+    <script>
+        const testConfig = {
+            'Dark Theme': {
+                layer: 'CartoDB.DarkMatter',
+                mapId: 'dark-map'
+            },
+            'Terrain': {
+                layer: 'OpenTopoMap',
+                mapId: 'terrain-map'
+            },
+            'Street Map': {
+                layer: 'OpenStreetMap.Mapnik',
+                mapId: 'street-map'
+            },
+            'Satellite': {
+                url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+                mapId: 'satellite-map'
+            }
+        };
+        
+        const results = [];
+        const resultsDiv = document.getElementById('results-content');
+        
+        function addResult(name, success, message) {
+            results.push({ name, success, message });
+            const p = document.createElement('p');
+            p.innerHTML = `<strong>${name}:</strong> ${success ? '✅' : '❌'} ${message}`;
+            p.className = success ? 'success' : 'error';
+            resultsDiv.appendChild(p);
+        }
+        
+        // Test each layer configuration
+        Object.keys(testConfig).forEach(name => {
+            const config = testConfig[name];
+            
+            try {
+                console.log(`Testing ${name}...`);
+                const map = L.map(config.mapId).setView([45.7, -87.1], 8);
+                
+                let layer;
+                if (config.layer) {
+                    // Using leaflet-providers
+                    if (typeof L.tileLayer.provider !== 'undefined') {
+                        layer = L.tileLayer.provider(config.layer);
+                        layer.addTo(map);
+                        addResult(name, true, `Provider layer "${config.layer}" loaded successfully`);
+                    } else {
+                        addResult(name, false, 'Leaflet Providers not available');
+                    }
+                } else if (config.url) {
+                    // Custom tile layer
+                    layer = L.tileLayer(config.url, {
+                        attribution: 'Test attribution'
+                    });
+                    layer.addTo(map);
+                    addResult(name, true, 'Custom URL layer loaded successfully');
+                }
+                
+                // Test if tiles are actually loading
+                layer.on('loading', () => {
+                    console.log(`${name}: Tiles loading...`);
+                });
+                
+                layer.on('load', () => {
+                    console.log(`${name}: Tiles loaded successfully`);
+                });
+                
+                layer.on('tileerror', (e) => {
+                    console.error(`${name}: Tile error:`, e);
+                    addResult(name, false, `Tile loading error: ${e.message || 'Unknown error'}`);
+                });
+                
+            } catch (error) {
+                console.error(`${name}: Configuration error:`, error);
+                addResult(name, false, `Configuration error: ${error.message}`);
+            }
+        });
+        
+        // Check library status
+        window.addEventListener('load', function() {
+            console.log('🔍 Library Check:');
+            const checks = {
+                'Leaflet': typeof L !== 'undefined',
+                'Leaflet Providers': typeof L !== 'undefined' && typeof L.tileLayer.provider !== 'undefined'
+            };
+            
+            Object.keys(checks).forEach(lib => {
+                const status = checks[lib] ? '✅ Loaded' : '❌ Failed';
+                console.log(`   ${lib}: ${status}`);
+                addResult(lib, checks[lib], checks[lib] ? 'Library loaded successfully' : 'Library failed to load');
+            });
+        });
+    </script>
+</body>
+</html>

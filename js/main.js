@@ -63,7 +63,9 @@ class DeltaCountyApp {
         });
         
         // Add default base layer
-        if (baseMaps['Dark Theme']) {
+        if (baseMaps['Street Map']) {
+            baseMaps['Street Map'].addTo(this.map);
+        } else if (baseMaps['Dark Theme']) {
             baseMaps['Dark Theme'].addTo(this.map);
         }
         
@@ -267,6 +269,12 @@ class DeltaCountyApp {
                 this.updateLayerControlWithDeltaLayers(deltaLayers);
             }
             
+            // Now that layers are loaded, add the township selector if it should be shown
+            if (DeltaCountyConfig.ui.showTownshipSelector && !this.townshipControl) {
+                console.log('🏞️ Adding township selector after service initialization');
+                this.addTownshipSelector();
+            }
+            
             this.hideLoading();
         } catch (error) {
             console.error('Failed to initialize Delta County Service:', error);
@@ -402,10 +410,9 @@ class DeltaCountyApp {
             this.addLegend();
         }
         
-        // Setup township selector
-        if (DeltaCountyConfig.ui.showTownshipSelector) {
-            this.addTownshipSelector();
-        }
+        // Township selector will be added after Delta County service loads
+        // to ensure the township layer is available
+        console.log('📋 Basic controls setup complete, township selector will be added after service initialization');
     }
     
     addLayerControl() {
@@ -443,10 +450,37 @@ class DeltaCountyApp {
     }
     
     addTownshipSelector() {
+        const self = this; // Capture the correct context
+        
         const TownshipControl = L.Control.extend({
-            onAdd: (map) => {
-                const div = L.DomUtil.create('div', 'query-control');
+            onAdd: function(map) {
+                const div = L.DomUtil.create('div', 'township-control');
+                div.style.cssText = `
+                    background: white;
+                    padding: 8px;
+                    border-radius: 5px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                    font-family: Arial, sans-serif;
+                `;
+                
+                const label = L.DomUtil.create('label', '', div);
+                label.innerHTML = '🏞️ Select Township:';
+                label.style.cssText = `
+                    display: block;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                    font-size: 12px;
+                    color: #333;
+                `;
+                
                 const select = L.DomUtil.create('select', 'whereClauseSelect', div);
+                select.style.cssText = `
+                    width: 150px;
+                    padding: 4px;
+                    border: 1px solid #ccc;
+                    border-radius: 3px;
+                    font-size: 12px;
+                `;
                 
                 DeltaCountyConfig.townships.forEach(township => {
                     const option = L.DomUtil.create('option', '', select);
@@ -454,78 +488,324 @@ class DeltaCountyApp {
                     option.innerHTML = township;
                 });
                 
-                L.DomEvent.addListener(select, 'change', (e) => {
-                    this.onTownshipChange(e.target.value);
+                L.DomEvent.addListener(select, 'change', function(e) {
+                    console.log('🏞️ Township selector changed:', e.target.value);
+                    self.onTownshipChange(e.target.value);
                 });
+                
+                // Prevent map events when interacting with the control
+                L.DomEvent.disableClickPropagation(div);
+                L.DomEvent.disableScrollPropagation(div);
                 
                 return div;
             }
         });
         
-        new TownshipControl({ position: 'bottomright' }).addTo(this.map);
+        this.townshipControl = new TownshipControl({ position: 'bottomright' }).addTo(this.map);
+        console.log('✅ Township selector added to map');
     }
     
     onTownshipChange(selectedTownship) {
-        if (selectedTownship === "Choose a Township") {
-            this.resetView();
+        console.log(`🏞️ Township selected: ${selectedTownship}`);
+        
+        if (selectedTownship === "Choose a Township" || !selectedTownship) {
+            console.log('🔄 Resetting township filter');
+            this.resetTownshipFilter();
             return;
         }
         
-        const townshipLayer = this.layers.townships;
-        if (!townshipLayer) {
-            console.warn('Township layer not found');
-            return;
+        try {
+            // Find township layer from Delta County service
+            const townshipLayer = this.findTownshipLayer();
+            if (!townshipLayer) {
+                console.warn('❌ Township layer not found in any service');
+                this.showTownshipNotFoundMessage();
+                return;
+            }
+            
+            console.log(`� Using township layer: ${townshipLayer.name}`);
+            
+            // Ensure the layer has a Leaflet layer
+            if (!townshipLayer.leafletLayer) {
+                console.error('❌ Township layer missing Leaflet layer');
+                this.showTownshipError(selectedTownship, 'Layer data not properly loaded');
+                return;
+            }
+            
+            console.log(`�🔍 Filtering township layer for: ${selectedTownship}`);
+            
+            // Hide all other layers first
+            this.hideNonTownshipLayers();
+            
+            // Show only the township layer
+            if (!this.map.hasLayer(townshipLayer.leafletLayer)) {
+                console.log('📍 Adding township layer to map');
+                townshipLayer.leafletLayer.addTo(this.map);
+            }
+            
+            // Filter and zoom to selected township
+            this.filterAndZoomToTownship(townshipLayer, selectedTownship);
+            
+        } catch (error) {
+            console.error('❌ Error in onTownshipChange:', error);
+            this.showTownshipError(selectedTownship, error.message);
         }
-        
-        // Query and zoom to selected township
-        townshipLayer.layer.query()
-            .where(`NAME = '${selectedTownship}'`)
-            .run((error, featureCollection) => {
-                if (error) {
-                    console.error('Township query error:', error);
-                    return;
-                }
-                
-                if (featureCollection.features.length > 0) {
-                    const bounds = L.geoJson(featureCollection).getBounds();
-                    this.map.fitBounds(bounds, { padding: [20, 20] });
-                    
-                    // Highlight selected township
-                    this.highlightTownship(featureCollection.features[0]);
-                }
-            });
     }
     
-    highlightTownship(feature) {
-        // Reset all layer styles first
-        Object.keys(this.layers).forEach(layerId => {
-            const layerData = this.layers[layerId];
-            layerData.layer.setStyle(layerData.config.style);
+    findTownshipLayer() {
+        console.log('🔍 Searching for township layer...');
+        
+        // Search in Delta County service manager
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            console.log(`   Checking ${this.deltaCountyServiceManager.layers.length} Delta County layers`);
+            
+            for (let i = 0; i < this.deltaCountyServiceManager.layers.length; i++) {
+                const layer = this.deltaCountyServiceManager.layers[i];
+                console.log(`   Layer ${i}: ${layer.name} (ID: ${layer.id})`);
+                
+                if (layer.name && layer.name.toLowerCase().includes('township')) {
+                    console.log(`✅ Found Delta County township layer: ${layer.name}`);
+                    console.log(`   Has leafletLayer: ${!!layer.leafletLayer}`);
+                    console.log(`   Visible: ${layer.visible}`);
+                    return layer;
+                }
+            }
+        } else {
+            console.log('   ❌ Delta County service manager not available');
+        }
+        
+        // Search in UW-Madison service manager if needed
+        if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+            console.log(`   Checking ${this.uwMadisonServiceManager.layers.length} UW-Madison layers`);
+            
+            for (let i = 0; i < this.uwMadisonServiceManager.layers.length; i++) {
+                const layer = this.uwMadisonServiceManager.layers[i];
+                console.log(`   UW Layer ${i}: ${layer.name} (ID: ${layer.id})`);
+                
+                if (layer.name && layer.name.toLowerCase().includes('township')) {
+                    console.log(`✅ Found UW-Madison township layer: ${layer.name}`);
+                    return layer;
+                }
+            }
+        } else {
+            console.log('   ❌ UW-Madison service manager not available');
+        }
+        
+        console.log('❌ No township layer found in any service');
+        return null;
+    }
+    
+    hideNonTownshipLayers() {
+        console.log('🔒 Hiding non-township layers');
+        
+        // Hide Delta County layers except townships
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            this.deltaCountyServiceManager.layers.forEach(layer => {
+                if (layer.leafletLayer && !layer.name.toLowerCase().includes('township')) {
+                    this.map.removeLayer(layer.leafletLayer);
+                }
+            });
+        }
+        
+        // Hide UW-Madison layers except townships
+        if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+            this.uwMadisonServiceManager.layers.forEach(layer => {
+                if (layer.leafletLayer && !layer.name.toLowerCase().includes('township')) {
+                    this.map.removeLayer(layer.leafletLayer);
+                }
+            });
+        }
+    }
+    
+    filterAndZoomToTownship(townshipLayer, selectedTownship) {
+        if (!townshipLayer.leafletLayer) {
+            console.error('❌ Township layer does not have a Leaflet layer');
+            return;
+        }
+        
+        try {
+            // Clear any existing filters
+            this.clearTownshipHighlights();
+            
+            // Use Esri Leaflet query if available
+            if (typeof L.esri !== 'undefined' && townshipLayer.leafletLayer.query) {
+                console.log(`🔍 Querying township: ${selectedTownship}`);
+                
+                townshipLayer.leafletLayer.query()
+                    .where(`NAME = '${selectedTownship}' OR TOWN = '${selectedTownship}' OR TOWNSHIP = '${selectedTownship}'`)
+                    .run((error, featureCollection) => {
+                        if (error) {
+                            console.error('❌ Township query error:', error);
+                            this.fallbackTownshipSearch(townshipLayer, selectedTownship);
+                            return;
+                        }
+                        
+                        if (featureCollection && featureCollection.features && featureCollection.features.length > 0) {
+                            console.log(`✅ Found ${featureCollection.features.length} township features`);
+                            this.zoomToTownshipFeatures(featureCollection.features);
+                            this.highlightTownshipFeatures(featureCollection.features);
+                        } else {
+                            console.warn(`⚠️ No features found for township: ${selectedTownship}`);
+                            this.fallbackTownshipSearch(townshipLayer, selectedTownship);
+                        }
+                    });
+            } else {
+                // Fallback: search through all features
+                this.fallbackTownshipSearch(townshipLayer, selectedTownship);
+            }
+        } catch (error) {
+            console.error('❌ Error filtering township:', error);
+            this.showTownshipError(selectedTownship, error.message);
+        }
+    }
+    
+    fallbackTownshipSearch(townshipLayer, selectedTownship) {
+        console.log(`🔄 Using fallback search for township: ${selectedTownship}`);
+        
+        const matchingFeatures = [];
+        
+        townshipLayer.leafletLayer.eachLayer(layer => {
+            if (layer.feature && layer.feature.properties) {
+                const props = layer.feature.properties;
+                const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
+                
+                if (townshipName.toLowerCase().includes(selectedTownship.toLowerCase())) {
+                    matchingFeatures.push(layer.feature);
+                }
+            }
         });
         
-        // Highlight the selected township
-        const townshipLayer = this.layers.townships;
-        if (townshipLayer) {
-            townshipLayer.layer.eachLayer(layer => {
-                if (layer.feature && layer.feature.properties.NAME === feature.properties.NAME) {
-                    layer.setStyle(DeltaCountyConfig.interaction.selectedStyle);
-                }
+        if (matchingFeatures.length > 0) {
+            console.log(`✅ Fallback search found ${matchingFeatures.length} features`);
+            this.zoomToTownshipFeatures(matchingFeatures);
+            this.highlightTownshipFeatures(matchingFeatures);
+        } else {
+            console.warn(`⚠️ Fallback search found no features for: ${selectedTownship}`);
+            this.showTownshipNotFoundMessage();
+        }
+    }
+    
+    zoomToTownshipFeatures(features) {
+        try {
+            const group = L.featureGroup(features.map(feature => L.geoJSON(feature)));
+            const bounds = group.getBounds();
+            
+            if (bounds.isValid()) {
+                this.map.fitBounds(bounds, { 
+                    padding: [20, 20],
+                    maxZoom: 12
+                });
+                console.log('✅ Zoomed to township bounds');
+            } else {
+                console.warn('⚠️ Invalid bounds for township features');
+            }
+        } catch (error) {
+            console.error('❌ Error zooming to township:', error);
+        }
+    }
+    
+    highlightTownshipFeatures(features) {
+        features.forEach(feature => {
+            // Find the corresponding Leaflet layer and highlight it
+            const townshipLayer = this.findTownshipLayer();
+            if (townshipLayer && townshipLayer.leafletLayer) {
+                townshipLayer.leafletLayer.eachLayer(layer => {
+                    if (layer.feature && 
+                        layer.feature.properties && 
+                        feature.properties &&
+                        this.featuresMatch(layer.feature.properties, feature.properties)) {
+                        
+                        layer.setStyle({
+                            color: '#00FFFB',
+                            weight: 4,
+                            fillOpacity: 0.6,
+                            opacity: 1
+                        });
+                    }
+                });
+            }
+        });
+        console.log(`✅ Highlighted ${features.length} township features`);
+    }
+    
+    featuresMatch(props1, props2) {
+        // Check if two feature property objects represent the same feature
+        const id1 = props1.OBJECTID || props1.FID || props1.ID;
+        const id2 = props2.OBJECTID || props2.FID || props2.ID;
+        
+        if (id1 && id2) {
+            return id1 === id2;
+        }
+        
+        // Fallback: compare names
+        const name1 = props1.NAME || props1.TOWN || props1.TOWNSHIP || '';
+        const name2 = props2.NAME || props2.TOWN || props2.TOWNSHIP || '';
+        
+        return name1.toLowerCase() === name2.toLowerCase();
+    }
+    
+    clearTownshipHighlights() {
+        const townshipLayer = this.findTownshipLayer();
+        if (townshipLayer && townshipLayer.leafletLayer && townshipLayer.style) {
+            townshipLayer.leafletLayer.eachLayer(layer => {
+                layer.setStyle(townshipLayer.style);
             });
         }
     }
     
-    resetView() {
+    showTownshipNotFoundMessage() {
+        console.warn('⚠️ Township not found');
+        // You could add a user notification here
+        if (typeof L.popup !== 'undefined') {
+            L.popup()
+                .setLatLng(this.map.getCenter())
+                .setContent('<b>Township Not Found</b><br>The selected township could not be located.')
+                .openOn(this.map);
+        }
+    }
+    
+    showTownshipError(townshipName, errorMessage) {
+        console.error(`❌ Township error for ${townshipName}: ${errorMessage}`);
+        if (typeof L.popup !== 'undefined') {
+            L.popup()
+                .setLatLng(this.map.getCenter())
+                .setContent(`<b>Error Loading Township</b><br>${errorMessage}`)
+                .openOn(this.map);
+        }
+    }
+    
+    resetTownshipFilter() {
+        console.log('🔄 Resetting township filter');
+        
+        // Show all layers again
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            this.deltaCountyServiceManager.layers.forEach(layer => {
+                if (layer.visible && layer.leafletLayer && !this.map.hasLayer(layer.leafletLayer)) {
+                    layer.leafletLayer.addTo(this.map);
+                }
+            });
+        }
+        
+        if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+            this.uwMadisonServiceManager.layers.forEach(layer => {
+                if (layer.visible && layer.leafletLayer && !this.map.hasLayer(layer.leafletLayer)) {
+                    layer.leafletLayer.addTo(this.map);
+                }
+            });
+        }
+        
+        // Clear highlights
+        this.clearTownshipHighlights();
+        
         // Reset to default view
         this.map.setView(DeltaCountyConfig.map.center, DeltaCountyConfig.map.zoom);
         
-        // Reset all layer styles
-        Object.keys(this.layers).forEach(layerId => {
-            const layerData = this.layers[layerId];
-            layerData.layer.setStyle(layerData.config.style);
-        });
-        
-        // Reset selection
-        this.selectedFeature = null;
+        console.log('✅ Township filter reset complete');
+    }
+    
+    resetView() {
+        // Reset to default view using the new township filter reset
+        this.resetTownshipFilter();
     }
     
     setupEventListeners() {
