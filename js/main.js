@@ -339,15 +339,37 @@ class DeltaCountyApp {
         // Add UW-Madison layers to the existing layer control
         setTimeout(() => {
             if (this.layerControl) {
+                // Initialize layer names tracker if not exists
+                if (!this.addedLayerNames) {
+                    this.addedLayerNames = new Set();
+                }
+                
                 uwLayers.forEach(layerConfig => {
                     if (layerConfig.leafletLayer) {
-                        this.layerControl.addOverlay(
-                            layerConfig.leafletLayer, 
-                            `🏛️ ${layerConfig.name}`
-                        );
+                        // Normalize layer name for comparison (remove emojis and extra spaces)
+                        const normalizedName = layerConfig.name.replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim().toLowerCase();
+                        
+                        // Check if we already have a layer with this name (ignoring case and emojis)
+                        let isDuplicate = false;
+                        for (const existingName of this.addedLayerNames) {
+                            if (existingName.includes('address points') && normalizedName.includes('address points')) {
+                                isDuplicate = true;
+                                console.log(`🚫 Skipping duplicate UW-Madison address points layer: ${layerConfig.name}`);
+                                break;
+                            }
+                        }
+                        
+                        if (!isDuplicate) {
+                            this.layerControl.addOverlay(
+                                layerConfig.leafletLayer, 
+                                `🏛️ ${layerConfig.name}`
+                            );
+                            this.addedLayerNames.add(normalizedName);
+                            console.log(`✅ Added UW-Madison layer: ${layerConfig.name}`);
+                        }
                     }
                 });
-                console.log(`📋 Added ${uwLayers.length} UW-Madison layers to layer control`);
+                console.log(`📋 Processed ${uwLayers.length} UW-Madison layers`);
             }
         }, 1500); // Delay to ensure layer control is ready
     }
@@ -390,9 +412,31 @@ class DeltaCountyApp {
         // We'll add the Delta County layers to the existing control
         setTimeout(() => {
             if (this.layerControl) {
+                // Track added layer names to prevent duplicates
+                if (!this.addedLayerNames) {
+                    this.addedLayerNames = new Set();
+                }
+                
                 deltaLayers.forEach(layerConfig => {
                     if (layerConfig.leafletLayer) {
-                        this.layerControl.addOverlay(layerConfig.leafletLayer, layerConfig.name);
+                        // Normalize layer name for comparison (remove emojis and extra spaces)
+                        const normalizedName = layerConfig.name.replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim().toLowerCase();
+                        
+                        // Check if we already have a layer with this name (ignoring case and emojis)
+                        let isDuplicate = false;
+                        for (const existingName of this.addedLayerNames) {
+                            if (existingName.includes('address points') && normalizedName.includes('address points')) {
+                                isDuplicate = true;
+                                console.log(`🚫 Skipping duplicate address points layer: ${layerConfig.name}`);
+                                break;
+                            }
+                        }
+                        
+                        if (!isDuplicate) {
+                            this.layerControl.addOverlay(layerConfig.leafletLayer, layerConfig.name);
+                            this.addedLayerNames.add(normalizedName);
+                            console.log(`✅ Added Delta County layer: ${layerConfig.name}`);
+                        }
                     }
                 });
             }
@@ -427,6 +471,9 @@ class DeltaCountyApp {
             position: 'topright',
             collapsed: false
         }).addTo(this.map);
+        
+        // Initialize layer names tracker for preventing duplicates
+        this.addedLayerNames = new Set();
     }
     
     addLegend() {
@@ -567,6 +614,14 @@ class DeltaCountyApp {
                     console.log(`✅ Found Delta County township layer: ${layer.name}`);
                     console.log(`   Has leafletLayer: ${!!layer.leafletLayer}`);
                     console.log(`   Visible: ${layer.visible}`);
+                    
+                    if (layer.leafletLayer) {
+                        console.log(`   Layer type: ${layer.leafletLayer.constructor.name}`);
+                        console.log(`   Has eachLayer: ${typeof layer.leafletLayer.eachLayer === 'function'}`);
+                        console.log(`   Has getLayers: ${typeof layer.leafletLayer.getLayers === 'function'}`);
+                        console.log(`   Has _layers: ${!!layer.leafletLayer._layers}`);
+                    }
+                    
                     return layer;
                 }
             }
@@ -584,6 +639,14 @@ class DeltaCountyApp {
                 
                 if (layer.name && layer.name.toLowerCase().includes('township')) {
                     console.log(`✅ Found UW-Madison township layer: ${layer.name}`);
+                    
+                    if (layer.leafletLayer) {
+                        console.log(`   Layer type: ${layer.leafletLayer.constructor.name}`);
+                        console.log(`   Has eachLayer: ${typeof layer.leafletLayer.eachLayer === 'function'}`);
+                        console.log(`   Has getLayers: ${typeof layer.leafletLayer.getLayers === 'function'}`);
+                        console.log(`   Has _layers: ${!!layer.leafletLayer._layers}`);
+                    }
+                    
                     return layer;
                 }
             }
@@ -663,17 +726,64 @@ class DeltaCountyApp {
         console.log(`🔄 Using fallback search for township: ${selectedTownship}`);
         
         const matchingFeatures = [];
+        let totalFeatures = 0;
         
-        townshipLayer.leafletLayer.eachLayer(layer => {
-            if (layer.feature && layer.feature.properties) {
-                const props = layer.feature.properties;
-                const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
-                
-                if (townshipName.toLowerCase().includes(selectedTownship.toLowerCase())) {
-                    matchingFeatures.push(layer.feature);
-                }
+        try {
+            if (townshipLayer.leafletLayer && typeof townshipLayer.leafletLayer.eachLayer === 'function') {
+                // Standard Leaflet layer with eachLayer method
+                townshipLayer.leafletLayer.eachLayer(layer => {
+                    totalFeatures++;
+                    if (layer.feature && layer.feature.properties) {
+                        const props = layer.feature.properties;
+                        const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
+                        
+                        if (townshipName.toLowerCase().includes(selectedTownship.toLowerCase())) {
+                            matchingFeatures.push(layer.feature);
+                        }
+                    }
+                });
+            } else if (townshipLayer.leafletLayer && townshipLayer.leafletLayer._layers) {
+                // Layer Group - iterate through _layers
+                console.log('🔍 Township layer is a LayerGroup, searching _layers');
+                Object.values(townshipLayer.leafletLayer._layers).forEach(layer => {
+                    totalFeatures++;
+                    if (layer.feature && layer.feature.properties) {
+                        const props = layer.feature.properties;
+                        const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
+                        
+                        if (townshipName.toLowerCase().includes(selectedTownship.toLowerCase())) {
+                            matchingFeatures.push(layer.feature);
+                        }
+                    }
+                });
+            } else if (townshipLayer.leafletLayer && townshipLayer.leafletLayer.getLayers) {
+                // FeatureGroup or LayerGroup with getLayers method
+                console.log('🔍 Township layer has getLayers method');
+                const layers = townshipLayer.leafletLayer.getLayers();
+                layers.forEach(layer => {
+                    totalFeatures++;
+                    if (layer.feature && layer.feature.properties) {
+                        const props = layer.feature.properties;
+                        const townshipName = props.NAME || props.TOWN || props.TOWNSHIP || '';
+                        
+                        if (townshipName.toLowerCase().includes(selectedTownship.toLowerCase())) {
+                            matchingFeatures.push(layer.feature);
+                        }
+                    }
+                });
+            } else {
+                console.error('❌ Township layer type not recognized:', typeof townshipLayer.leafletLayer);
+                console.log('Available methods:', Object.getOwnPropertyNames(townshipLayer.leafletLayer));
+                this.showTownshipError(selectedTownship, 'Township layer type not supported for filtering');
+                return;
             }
-        });
+        } catch (error) {
+            console.error('❌ Error in fallback search:', error);
+            this.showTownshipError(selectedTownship, `Search error: ${error.message}`);
+            return;
+        }
+        
+        console.log(`Searched ${totalFeatures} total features`);
         
         if (matchingFeatures.length > 0) {
             console.log(`✅ Fallback search found ${matchingFeatures.length} features`);
@@ -705,27 +815,74 @@ class DeltaCountyApp {
     }
     
     highlightTownshipFeatures(features) {
-        features.forEach(feature => {
-            // Find the corresponding Leaflet layer and highlight it
-            const townshipLayer = this.findTownshipLayer();
-            if (townshipLayer && townshipLayer.leafletLayer) {
-                townshipLayer.leafletLayer.eachLayer(layer => {
-                    if (layer.feature && 
-                        layer.feature.properties && 
-                        feature.properties &&
-                        this.featuresMatch(layer.feature.properties, feature.properties)) {
-                        
-                        layer.setStyle({
-                            color: '#00FFFB',
-                            weight: 4,
-                            fillOpacity: 0.6,
-                            opacity: 1
+        try {
+            features.forEach(feature => {
+                // Find the corresponding Leaflet layer and highlight it
+                const townshipLayer = this.findTownshipLayer();
+                if (townshipLayer && townshipLayer.leafletLayer) {
+                    
+                    if (typeof townshipLayer.leafletLayer.eachLayer === 'function') {
+                        // Standard layer with eachLayer method
+                        townshipLayer.leafletLayer.eachLayer(layer => {
+                            if (layer.feature && 
+                                layer.feature.properties && 
+                                feature.properties &&
+                                this.featuresMatch(layer.feature.properties, feature.properties)) {
+                                
+                                if (typeof layer.setStyle === 'function') {
+                                    layer.setStyle({
+                                        color: '#00FFFB',
+                                        weight: 4,
+                                        fillOpacity: 0.6,
+                                        opacity: 1
+                                    });
+                                }
+                            }
+                        });
+                    } else if (townshipLayer.leafletLayer._layers) {
+                        // Layer Group - iterate through _layers
+                        Object.values(townshipLayer.leafletLayer._layers).forEach(layer => {
+                            if (layer.feature && 
+                                layer.feature.properties && 
+                                feature.properties &&
+                                this.featuresMatch(layer.feature.properties, feature.properties)) {
+                                
+                                if (typeof layer.setStyle === 'function') {
+                                    layer.setStyle({
+                                        color: '#00FFFB',
+                                        weight: 4,
+                                        fillOpacity: 0.6,
+                                        opacity: 1
+                                    });
+                                }
+                            }
+                        });
+                    } else if (townshipLayer.leafletLayer.getLayers) {
+                        // FeatureGroup or LayerGroup with getLayers method
+                        const layers = townshipLayer.leafletLayer.getLayers();
+                        layers.forEach(layer => {
+                            if (layer.feature && 
+                                layer.feature.properties && 
+                                feature.properties &&
+                                this.featuresMatch(layer.feature.properties, feature.properties)) {
+                                
+                                if (typeof layer.setStyle === 'function') {
+                                    layer.setStyle({
+                                        color: '#00FFFB',
+                                        weight: 4,
+                                        fillOpacity: 0.6,
+                                        opacity: 1
+                                    });
+                                }
+                            }
                         });
                     }
-                });
-            }
-        });
-        console.log(`✅ Highlighted ${features.length} township features`);
+                }
+            });
+            console.log(`✅ Highlighted ${features.length} township features`);
+        } catch (error) {
+            console.error('❌ Error highlighting township features:', error);
+        }
     }
     
     featuresMatch(props1, props2) {
@@ -745,11 +902,38 @@ class DeltaCountyApp {
     }
     
     clearTownshipHighlights() {
-        const townshipLayer = this.findTownshipLayer();
-        if (townshipLayer && townshipLayer.leafletLayer && townshipLayer.style) {
-            townshipLayer.leafletLayer.eachLayer(layer => {
-                layer.setStyle(townshipLayer.style);
-            });
+        try {
+            const townshipLayer = this.findTownshipLayer();
+            if (townshipLayer && townshipLayer.leafletLayer && townshipLayer.style) {
+                
+                if (typeof townshipLayer.leafletLayer.eachLayer === 'function') {
+                    // Standard layer with eachLayer method
+                    townshipLayer.leafletLayer.eachLayer(layer => {
+                        if (typeof layer.setStyle === 'function') {
+                            layer.setStyle(townshipLayer.style);
+                        }
+                    });
+                } else if (townshipLayer.leafletLayer._layers) {
+                    // Layer Group - iterate through _layers
+                    Object.values(townshipLayer.leafletLayer._layers).forEach(layer => {
+                        if (typeof layer.setStyle === 'function') {
+                            layer.setStyle(townshipLayer.style);
+                        }
+                    });
+                } else if (townshipLayer.leafletLayer.getLayers) {
+                    // FeatureGroup or LayerGroup with getLayers method
+                    const layers = townshipLayer.leafletLayer.getLayers();
+                    layers.forEach(layer => {
+                        if (typeof layer.setStyle === 'function') {
+                            layer.setStyle(townshipLayer.style);
+                        }
+                    });
+                }
+                
+                console.log('✅ Township highlights cleared');
+            }
+        } catch (error) {
+            console.error('❌ Error clearing township highlights:', error);
         }
     }
     
