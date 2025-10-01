@@ -102,7 +102,7 @@ class DeltaCountyServiceManager {
                 opacity: 0.7
             },
             'Site_Structure_Address_Points_Delta_County': {
-                radius: 5,
+                radius: 2.5,  // Half the original size (was 5)
                 fillColor: '#3F612D',
                 color: '#000',
                 weight: 1,
@@ -281,7 +281,14 @@ class DeltaCountyServiceManager {
 
                 const layer = L.esri.featureLayer({
                     url: layerConfig.url,
-                    style: layerConfig.style
+                    style: layerConfig.style,
+                    pointToLayer: (feature, latlng) => {
+                        // Use circle markers for address points with the specified radius
+                        if (layerConfig.style && layerConfig.style.radius) {
+                            return L.circleMarker(latlng, layerConfig.style);
+                        }
+                        return L.marker(latlng);
+                    }
                 });
 
                 // Add error handling for layer loading

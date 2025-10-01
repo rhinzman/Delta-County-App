@@ -101,7 +101,7 @@ class DeltaCountyFallbackService {
                 opacity: 0.7
             },
             'Address Points': {
-                radius: 5,
+                radius: 2.5,  // Half the original size (was 5)
                 fillColor: '#3F612D',
                 color: '#000',
                 weight: 1,
