@@ -88,7 +88,7 @@ class DeltaCountyFallbackService {
         const styles = {
             'Townships': {
                 color: '#2E86AB',
-                weight: 2,
+                weight: 1,
                 fillColor: '#A23B72',
                 fillOpacity: 0.1,
                 opacity: 0.8
@@ -101,7 +101,7 @@ class DeltaCountyFallbackService {
                 opacity: 0.7
             },
             'Address Points': {
-                radius: 2.5,  // Half the original size (was 5)
+                radius: 1,
                 fillColor: '#3F612D',
                 color: '#000',
                 weight: 1,
