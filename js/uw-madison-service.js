@@ -163,10 +163,11 @@ class UWMadisonServiceManager {
                 opacity: 0.8
             },
             'esriGeometryPoint': {
+                // Simplified point styling for better performance
                 color: this.getColorForIndex(index),
-                weight: 2,
-                fillOpacity: 0.8,
-                radius: 6
+                weight: 0,
+                opacity: 0.8,
+                fillOpacity: 0
             }
         };
         

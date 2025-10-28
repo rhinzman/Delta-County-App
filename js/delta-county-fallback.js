@@ -55,12 +55,7 @@ class DeltaCountyFallbackService {
         
         const layer = L.geoJSON(geoJsonData, {
             style: style,
-            pointToLayer: (feature, latlng) => {
-                if (style.radius) {
-                    return L.circleMarker(latlng, style);
-                }
-                return L.marker(latlng);
-            },
+            // Simplified point rendering for better performance
             onEachFeature: (feature, layer) => {
                 const popup = this.createPopupContent(layerName, feature.properties);
                 layer.bindPopup(popup);
@@ -101,12 +96,11 @@ class DeltaCountyFallbackService {
                 opacity: 0.7
             },
             'Address Points': {
-                radius: 1,
-                fillColor: '#3F612D',
-                color: '#000',
-                weight: 1,
-                opacity: 1,
-                fillOpacity: 0.8
+                // Simplified styling for better performance
+                color: '#3F612D',
+                weight: 0,
+                opacity: 0.8,
+                fillOpacity: 0
             },
             'Roads': {
                 color: '#231F20',
