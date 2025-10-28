@@ -103,11 +103,13 @@ class DeltaCountyLayerManager {
                 opacity: 0.7
             },
             'Site_Structure_Address_Points_Delta_County': {
-                // Simplified styling for better performance
-                color: '#3F612D',
-                weight: 0,
-                opacity: 0.8,
-                fillOpacity: 0
+                // Simple blue dot for address points
+                radius: 3,
+                fillColor: '#3498db',
+                color: '#2980b9',
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 0.8
             },
             'Road_Centerlines_Delta_County': {
                 color: '#231F20',
@@ -303,11 +305,13 @@ class DeltaCountyLayerManager {
         switch (geometryType) {
             case 'esriGeometryPoint':
                 return {
-                    // Simplified default point styling for better performance
-                    color: '#ff7800',
-                    weight: 0,
-                    opacity: 0.8,
-                    fillOpacity: 0
+                    // Simple blue dot default for point geometry
+                    radius: 3,
+                    fillColor: '#3498db',
+                    color: '#2980b9',
+                    weight: 1,
+                    opacity: 1,
+                    fillOpacity: 0.8
                 };
             case 'esriGeometryPolyline':
                 return {

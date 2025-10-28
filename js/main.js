@@ -604,6 +604,7 @@ class DeltaCountyApp {
         if (selectedTownship === "Choose a Township" || !selectedTownship) {
             console.log('🔄 Resetting township filter');
             this.resetTownshipFilter();
+            this.resetAddressPointFilter();
             return;
         }
         
@@ -638,6 +639,9 @@ class DeltaCountyApp {
             
             // Filter and zoom to selected township
             this.filterAndZoomToTownship(townshipLayer, selectedTownship);
+            
+            // Filter address points within the selected township
+            this.filterAddressPointsByTownship(selectedTownship);
             
         } catch (error) {
             console.error('❌ Error in onTownshipChange:', error);
@@ -1031,6 +1035,181 @@ class DeltaCountyApp {
         this.map.setView(DeltaCountyConfig.map.center, DeltaCountyConfig.map.zoom);
         
         console.log('✅ Township filter reset complete');
+    }
+    
+    filterAddressPointsByTownship(selectedTownship) {
+        console.log(`🏠 Filtering address points for township: ${selectedTownship}`);
+        
+        try {
+            // Find address point layers from all services
+            const addressPointLayers = this.findAddressPointLayers();
+            
+            if (addressPointLayers.length === 0) {
+                console.warn('⚠️ No address point layers found');
+                return;
+            }
+            
+            console.log(`📍 Found ${addressPointLayers.length} address point layers to filter`);
+            
+            addressPointLayers.forEach(layer => {
+                this.filterLayerByTownship(layer, selectedTownship);
+            });
+            
+        } catch (error) {
+            console.error('❌ Error filtering address points:', error);
+        }
+    }
+    
+    findAddressPointLayers() {
+        const addressPointLayers = [];
+        
+        // Search Delta County service
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            this.deltaCountyServiceManager.layers.forEach(layer => {
+                if (layer.name && layer.name.toLowerCase().includes('address')) {
+                    console.log(`📍 Found Delta County address layer: ${layer.name}`);
+                    addressPointLayers.push(layer);
+                }
+            });
+        }
+        
+        // Search UW-Madison service
+        if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+            this.uwMadisonServiceManager.layers.forEach(layer => {
+                if (layer.name && layer.name.toLowerCase().includes('address')) {
+                    console.log(`📍 Found UW-Madison address layer: ${layer.name}`);
+                    addressPointLayers.push(layer);
+                }
+            });
+        }
+        
+        return addressPointLayers;
+    }
+    
+    filterLayerByTownship(layer, selectedTownship) {
+        if (!layer.leafletLayer) {
+            console.warn(`⚠️ Layer ${layer.name} has no Leaflet layer`);
+            return;
+        }
+        
+        try {
+            // Use Esri Leaflet definitionExpression if available (most efficient)
+            if (typeof L.esri !== 'undefined' && layer.leafletLayer.setDefinitionExpression) {
+                console.log(`🔍 Using definition expression for ${layer.name}`);
+                
+                // Try different possible township field names
+                const whereClause = `TOWNSHIP = '${selectedTownship}' OR TOWN = '${selectedTownship}' OR TOWNSHIPNAME = '${selectedTownship}' OR TOWNSHIP_NAME = '${selectedTownship}'`;
+                layer.leafletLayer.setDefinitionExpression(whereClause);
+                
+                console.log(`✅ Applied definition expression to ${layer.name}: ${whereClause}`);
+            } else {
+                console.log(`🔍 Using client-side filtering for ${layer.name}`);
+                this.clientSideFilterAddressPoints(layer, selectedTownship);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error filtering ${layer.name}:`, error);
+        }
+    }
+    
+    clientSideFilterAddressPoints(layer, selectedTownship) {
+        // Store original layer for restoration
+        if (!layer.originalLeafletLayer) {
+            layer.originalLeafletLayer = layer.leafletLayer;
+        }
+        
+        // Remove current layer from map
+        if (this.map.hasLayer(layer.leafletLayer)) {
+            this.map.removeLayer(layer.leafletLayer);
+        }
+        
+        // Create filtered layer
+        const filteredFeatures = [];
+        
+        try {
+            if (typeof layer.leafletLayer.eachLayer === 'function') {
+                layer.leafletLayer.eachLayer(pointLayer => {
+                    if (pointLayer.feature && pointLayer.feature.properties) {
+                        const props = pointLayer.feature.properties;
+                        const township = props.TOWNSHIP || props.TOWN || props.TOWNSHIPNAME || props.TOWNSHIP_NAME || '';
+                        
+                        if (township.toLowerCase().includes(selectedTownship.toLowerCase())) {
+                            filteredFeatures.push(pointLayer.feature);
+                        }
+                    }
+                });
+            }
+            
+            if (filteredFeatures.length > 0) {
+                // Create new layer with filtered features
+                const filteredLayer = L.geoJSON(filteredFeatures, {
+                    pointToLayer: (feature, latlng) => {
+                        return L.circleMarker(latlng, layer.style || {
+                            radius: 3,
+                            fillColor: '#3498db',
+                            color: '#2980b9',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: (feature, pointLayer) => {
+                        if (layer.popupTemplate) {
+                            const popupContent = this.populateTemplate(layer.popupTemplate.content, feature.properties);
+                            pointLayer.bindPopup(popupContent);
+                        }
+                    }
+                });
+                
+                // Replace layer reference and add to map
+                layer.leafletLayer = filteredLayer;
+                filteredLayer.addTo(this.map);
+                
+                console.log(`✅ Filtered ${layer.name}: showing ${filteredFeatures.length} address points in ${selectedTownship}`);
+            } else {
+                console.log(`⚠️ No address points found in ${selectedTownship} for ${layer.name}`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error in client-side filtering for ${layer.name}:`, error);
+        }
+    }
+    
+    resetAddressPointFilter() {
+        console.log('🔄 Resetting address point filter');
+        
+        try {
+            const addressPointLayers = this.findAddressPointLayers();
+            
+            addressPointLayers.forEach(layer => {
+                // Clear definition expression if available
+                if (layer.leafletLayer && layer.leafletLayer.setDefinitionExpression) {
+                    layer.leafletLayer.setDefinitionExpression('');
+                    console.log(`✅ Cleared definition expression for ${layer.name}`);
+                }
+                
+                // Restore original layer if we did client-side filtering
+                if (layer.originalLeafletLayer) {
+                    if (this.map.hasLayer(layer.leafletLayer)) {
+                        this.map.removeLayer(layer.leafletLayer);
+                    }
+                    
+                    layer.leafletLayer = layer.originalLeafletLayer;
+                    delete layer.originalLeafletLayer;
+                    
+                    if (layer.visible) {
+                        layer.leafletLayer.addTo(this.map);
+                    }
+                    
+                    console.log(`✅ Restored original layer for ${layer.name}`);
+                }
+            });
+            
+            console.log('✅ Address point filter reset complete');
+            
+        } catch (error) {
+            console.error('❌ Error resetting address point filter:', error);
+        }
     }
     
     resetView() {
