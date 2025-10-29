@@ -105,8 +105,8 @@ class DeltaCountyFallbackService {
                 // Simple blue dot for address points
                 radius: 3,
                 fillColor: '#3498db',
-                color: '#2980b9',
-                weight: 1,
+                color: '#3498db', // Match fill color to remove shadow
+                weight: 0, // Remove border weight
                 opacity: 1,
                 fillOpacity: 0.8
             },

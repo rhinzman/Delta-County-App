@@ -276,6 +276,10 @@ class DeltaCountyApp {
             const deltaLayers = await this.deltaCountyServiceManager.initialize();
             
             console.log(`Successfully integrated ${deltaLayers.length} Delta County layers`);
+            console.log('📊 Layer Summary:');
+            deltaLayers.forEach(layer => {
+                console.log(`   • ${layer.name}: visible=${layer.visible}, hasLeafletLayer=${!!layer.leafletLayer}`);
+            });
             
             // Update layer control to include Delta County layers
             if (deltaLayers.length > 0) {
@@ -428,18 +432,35 @@ class DeltaCountyApp {
     }
     
     updateLayerControlWithDeltaLayers(deltaLayers) {
+        console.log(`🎛️ Updating layer control with ${deltaLayers.length} Delta County layers`);
+        
         // Add only the 4 allowed layers to the custom control
         setTimeout(() => {
             if (this.layerControl) {
                 deltaLayers.forEach(layerConfig => {
+                    console.log(`🔍 Processing layer for control: ${layerConfig.name}`);
+                    
                     if (layerConfig.leafletLayer) {
                         const layerType = this.isAllowedLayer(layerConfig.name);
                         
                         if (layerType) {
+                            console.log(`✅ Adding to layer control: ${layerConfig.name} (type: ${layerType})`);
                             this.addLayerToCustomControl(layerConfig.leafletLayer, layerConfig.name, layerType);
+                            
+                            // Special logging for roads
+                            if (layerType === 'roads') {
+                                console.log(`🛣️ ROAD LAYER DEBUG:`, {
+                                    name: layerConfig.name,
+                                    visible: layerConfig.visible,
+                                    onMap: this.map.hasLayer(layerConfig.leafletLayer),
+                                    style: layerConfig.style
+                                });
+                            }
                         } else {
                             console.log(`⏭️ Skipping non-allowed layer: ${layerConfig.name}`);
                         }
+                    } else {
+                        console.error(`❌ No leaflet layer for: ${layerConfig.name}`);
                     }
                 });
             }

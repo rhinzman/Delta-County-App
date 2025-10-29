@@ -130,7 +130,7 @@ class DeltaCountyServiceManager {
             },
             'Site_Structure_Address_Points_Delta_County': {
                 // Simple blue dot for address points without shadow/border
-                radius: 1,
+                radius: 3,
                 fillColor: '#3498db',
                 color: '#3498db', // Match fill color to remove shadow
                 weight: 0, // Remove border weight
@@ -308,6 +308,8 @@ class DeltaCountyServiceManager {
 
                 console.log(`🔧 Creating Esri feature layer for: ${layerConfig.name}`);
                 console.log(`   URL: ${layerConfig.url}`);
+                console.log(`   Style:`, layerConfig.style);
+                console.log(`   Visible by default: ${layerConfig.visible}`);
 
                 const layer = L.esri.featureLayer({
                     url: layerConfig.url,
@@ -330,6 +332,10 @@ class DeltaCountyServiceManager {
                     console.log(`✅ Successfully loaded layer: ${layerConfig.name}`);
                 });
 
+                layer.on('loading', function() {
+                    console.log(`⏳ Loading layer: ${layerConfig.name}`);
+                });
+
                 // Add popup functionality
                 layer.bindPopup((layer) => {
                     return L.Util.template(layerConfig.popupTemplate.content, layer.feature.properties);
@@ -340,8 +346,20 @@ class DeltaCountyServiceManager {
 
                 // Add to map if visible
                 if (layerConfig.visible) {
+                    console.log(`🗺️ Adding visible layer to map: ${layerConfig.name}`);
                     layer.addTo(this.map);
-                    console.log(`🗺️ Added visible layer to map: ${layerConfig.name}`);
+                    console.log(`✅ Layer added to map: ${layerConfig.name}`);
+                    
+                    // Check if layer was actually added
+                    setTimeout(() => {
+                        if (this.map.hasLayer(layer)) {
+                            console.log(`✓ Confirmed layer is on map: ${layerConfig.name}`);
+                        } else {
+                            console.error(`✗ Layer not found on map: ${layerConfig.name}`);
+                        }
+                    }, 2000);
+                } else {
+                    console.log(`📋 Layer configured but not visible: ${layerConfig.name}`);
                 }
 
                 console.log(`✓ Configured layer: ${layerConfig.name}`);
