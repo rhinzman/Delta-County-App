@@ -365,40 +365,21 @@ class DeltaCountyApp {
     }
     
     updateLayerControlWithUWLayers(uwLayers) {
-        // Add UW-Madison layers to the existing layer control
+        // Add only the 4 allowed layers to the custom control
         setTimeout(() => {
             if (this.layerControl) {
-                // Initialize layer names tracker if not exists
-                if (!this.addedLayerNames) {
-                    this.addedLayerNames = new Set();
-                }
-                
                 uwLayers.forEach(layerConfig => {
                     if (layerConfig.leafletLayer) {
-                        // Normalize layer name for comparison (remove emojis and extra spaces)
-                        const normalizedName = layerConfig.name.replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim().toLowerCase();
+                        const layerType = this.isAllowedLayer(layerConfig.name);
                         
-                        // Check if we already have a layer with this name (ignoring case and emojis)
-                        let isDuplicate = false;
-                        for (const existingName of this.addedLayerNames) {
-                            if (existingName.includes('address points') && normalizedName.includes('address points')) {
-                                isDuplicate = true;
-                                console.log(`🚫 Skipping duplicate UW-Madison address points layer: ${layerConfig.name}`);
-                                break;
-                            }
-                        }
-                        
-                        if (!isDuplicate) {
-                            this.layerControl.addOverlay(
-                                layerConfig.leafletLayer, 
-                                `🏛️ ${layerConfig.name}`
-                            );
-                            this.addedLayerNames.add(normalizedName);
-                            console.log(`✅ Added UW-Madison layer: ${layerConfig.name}`);
+                        if (layerType) {
+                            this.addLayerToCustomControl(layerConfig.leafletLayer, layerConfig.name, layerType);
+                        } else {
+                            console.log(`⏭️ Skipping non-allowed UW layer: ${layerConfig.name}`);
                         }
                     }
                 });
-                console.log(`📋 Processed ${uwLayers.length} UW-Madison layers`);
+                console.log(`📋 Processed ${uwLayers.length} UW-Madison layers for custom control`);
             }
         }, 1500); // Delay to ensure layer control is ready
     }
@@ -442,34 +423,17 @@ class DeltaCountyApp {
     }
     
     updateLayerControlWithDeltaLayers(deltaLayers) {
-        // This will be called after the regular layer control is set up
-        // We'll add the Delta County layers to the existing control
+        // Add only the 4 allowed layers to the custom control
         setTimeout(() => {
             if (this.layerControl) {
-                // Track added layer names to prevent duplicates
-                if (!this.addedLayerNames) {
-                    this.addedLayerNames = new Set();
-                }
-                
                 deltaLayers.forEach(layerConfig => {
                     if (layerConfig.leafletLayer) {
-                        // Normalize layer name for comparison (remove emojis and extra spaces)
-                        const normalizedName = layerConfig.name.replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim().toLowerCase();
+                        const layerType = this.isAllowedLayer(layerConfig.name);
                         
-                        // Check if we already have a layer with this name (ignoring case and emojis)
-                        let isDuplicate = false;
-                        for (const existingName of this.addedLayerNames) {
-                            if (existingName.includes('address points') && normalizedName.includes('address points')) {
-                                isDuplicate = true;
-                                console.log(`🚫 Skipping duplicate address points layer: ${layerConfig.name}`);
-                                break;
-                            }
-                        }
-                        
-                        if (!isDuplicate) {
-                            this.layerControl.addOverlay(layerConfig.leafletLayer, layerConfig.name);
-                            this.addedLayerNames.add(normalizedName);
-                            console.log(`✅ Added Delta County layer: ${layerConfig.name}`);
+                        if (layerType) {
+                            this.addLayerToCustomControl(layerConfig.leafletLayer, layerConfig.name, layerType);
+                        } else {
+                            console.log(`⏭️ Skipping non-allowed layer: ${layerConfig.name}`);
                         }
                     }
                 });
@@ -494,13 +458,10 @@ class DeltaCountyApp {
     }
     
     addLayerControl() {
+        // Create custom layer control with only 4 specific layers
         const overlayMaps = {};
         
-        Object.keys(this.layers).forEach(layerId => {
-            const layerData = this.layers[layerId];
-            overlayMaps[layerData.config.name] = layerData.layer;
-        });
-        
+        // Initialize with empty overlay maps - will be populated by services
         this.layerControl = L.control.layers(this.baseMaps, overlayMaps, {
             position: 'topright',
             collapsed: false
@@ -508,6 +469,48 @@ class DeltaCountyApp {
         
         // Initialize layer names tracker for preventing duplicates
         this.addedLayerNames = new Set();
+        
+        // Store references to the 4 allowed layers
+        this.allowedLayers = {
+            'townships': null,
+            'parcels': null,
+            'roads': null,
+            'address_points': null
+        };
+    }
+    
+    isAllowedLayer(layerName) {
+        // Check if this layer is one of our 4 allowed layers
+        const normalizedName = layerName.toLowerCase().replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim();
+        
+        if (normalizedName.includes('township')) return 'townships';
+        if (normalizedName.includes('parcel')) return 'parcels';
+        if (normalizedName.includes('road') || normalizedName.includes('centerline')) return 'roads';
+        if (normalizedName.includes('address')) return 'address_points';
+        
+        return null;
+    }
+    
+    addLayerToCustomControl(layer, layerName, layerType) {
+        // Only add if we don't already have this layer type
+        if (!this.allowedLayers[layerType]) {
+            this.allowedLayers[layerType] = layer;
+            
+            // Create display name with emoji
+            let displayName;
+            switch(layerType) {
+                case 'townships': displayName = '🏞️ Townships'; break;
+                case 'parcels': displayName = '📄 Parcels'; break;
+                case 'roads': displayName = '🛣️ Road Centerlines'; break;
+                case 'address_points': displayName = '🏠 Address Points'; break;
+                default: displayName = layerName;
+            }
+            
+            this.layerControl.addOverlay(layer, displayName);
+            console.log(`✅ Added to custom control: ${displayName}`);
+        } else {
+            console.log(`⏭️ Skipping duplicate layer type: ${layerType}`);
+        }
     }
     
     addLegend() {

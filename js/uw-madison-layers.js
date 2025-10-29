@@ -102,11 +102,11 @@ class DeltaCountyLayerManager {
                 opacity: 0.7
             },
             'Site_Structure_Address_Points_Delta_County': {
-                // Simple blue dot for address points
+                // Simple blue dot for address points without shadow/border
                 radius: 3,
                 fillColor: '#3498db',
-                color: '#2980b9',
-                weight: 1,
+                color: '#3498db', // Match fill color to remove shadow
+                weight: 0, // Remove border weight
                 opacity: 1,
                 fillOpacity: 0.8
             }
@@ -291,8 +291,8 @@ class DeltaCountyLayerManager {
                     // Simple blue dot default for point geometry
                     radius: 3,
                     fillColor: '#3498db',
-                    color: '#2980b9',
-                    weight: 1,
+                    color: '#3498db',
+                    weight: 0,
                     opacity: 1,
                     fillOpacity: 0.8
                 };

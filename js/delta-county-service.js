@@ -49,9 +49,16 @@ class DeltaCountyServiceManager {
         console.log('🔧 Processing Delta County service layers...');
 
         layers.forEach(layerInfo => {
-            // Skip Road_Centerlines_Delta_County layer
-            if (layerInfo.name === 'Road_Centerlines_Delta_County') {
-                console.log(`⏭️ Skipping layer: ${layerInfo.name}`);
+            // Only include the 4 specific layers we want
+            const allowedLayers = [
+                'Site_Structure_Address_Points_Delta_County',
+                'Road_Centerlines_Delta_County', 
+                'parcels',
+                'Townships'
+            ];
+            
+            if (!allowedLayers.includes(layerInfo.name)) {
+                console.log(`⏭️ Skipping layer: ${layerInfo.name} (not in allowed list)`);
                 return;
             }
             
@@ -76,6 +83,7 @@ class DeltaCountyServiceManager {
         // Clean up layer names for better display
         const nameMap = {
             'Site_Structure_Address_Points_Delta_County': '🏠 Address Points',
+            'Road_Centerlines_Delta_County': '🛣️ Road Centerlines',
             'parcels': '📄 Parcels',
             'Townships': '🏞️ Townships'
         };
@@ -107,13 +115,18 @@ class DeltaCountyServiceManager {
                 opacity: 0.7
             },
             'Site_Structure_Address_Points_Delta_County': {
-                // Simple blue dot for address points
+                // Simple blue dot for address points without shadow/border
                 radius: 1,
                 fillColor: '#3498db',
-                color: '#2980b9',
-                weight: 1,
+                color: '#3498db', // Match fill color to remove shadow
+                weight: 0, // Remove border weight
                 opacity: 1,
                 fillOpacity: 0.8
+            },
+            'Road_Centerlines_Delta_County': {
+                color: '#231F20',
+                weight: 2,
+                opacity: 0.8
             }
         };
         
@@ -190,6 +203,17 @@ class DeltaCountyServiceManager {
                         <p><strong>City:</strong> {CITY}</p>
                         <p><strong>State:</strong> {STATE}</p>
                         <p><strong>ZIP:</strong> {ZIP}</p>
+                    </div>
+                `
+            },
+            'Road_Centerlines_Delta_County': {
+                title: '🛣️ Road: {ROAD_NAME}',
+                content: `
+                    <div style="padding: 10px; font-family: Arial, sans-serif;">
+                        <h4 style="margin-top: 0; color: #231F20;">Road Information</h4>
+                        <p><strong>Road Name:</strong> {ROAD_NAME}</p>
+                        <p><strong>Type:</strong> {ROAD_TYPE}</p>
+                        <p><strong>Surface:</strong> {SURFACE}</p>
                     </div>
                 `
             }

@@ -156,9 +156,13 @@ main {
 /* Query control styles */
 .query-control {
     background: white;
+    border: 1px solid #ddd;
     border-radius: 8px;
     padding: 0.5rem;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    font-size: 0.9rem;
+    min-width: 200px;
+    margin-bottom: 1rem;
+
 }
 
 /* Township control styles */
@@ -223,6 +227,11 @@ main {
 .leaflet-control-layers {
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* Hide marker images for address points - use circle markers instead */
+.leaflet-container .leaflet-marker-pane img {
+    display: none;
 }
 
 .leaflet-popup-content-wrapper {

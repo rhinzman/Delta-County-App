@@ -163,11 +163,11 @@ class UWMadisonServiceManager {
                 opacity: 0.8
             },
             'esriGeometryPoint': {
-                // Simple blue dot for address points
+                // Simple blue dot for address points without shadow/border
                 radius: 3,
                 fillColor: '#3498db',
-                color: '#2980b9',
-                weight: 1,
+                color: '#3498db', // Match fill color to remove shadow
+                weight: 0, // Remove border weight
                 opacity: 1,
                 fillOpacity: 0.8
             }
