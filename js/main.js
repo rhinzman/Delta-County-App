@@ -1407,8 +1407,8 @@ class DeltaCountyApp {
             // Store the current query filter
             this.currentQueryFilter = townshipName;
             
-            // Filter all applicable layers
-            this.filterAllLayersByTownship(townshipName);
+            // Filter all applicable layers using proper Esri query
+            this.filterAllLayersByTownshipEsri(townshipName);
             
             // Update the township selector to match
             if (this.townshipControl) {
@@ -1419,7 +1419,7 @@ class DeltaCountyApp {
             }
             
             // Show notification
-            this.showQueryNotification(`Filtered to ${townshipName} township`, 'success');
+            this.showQueryNotification(`Filtering by ${townshipName} township...`, 'info');
             
         } catch (error) {
             console.error('❌ Error applying township query filter:', error);
@@ -1434,8 +1434,8 @@ class DeltaCountyApp {
             // Clear the current filter
             this.currentQueryFilter = null;
             
-            // Reset all layers
-            this.resetAllLayerFilters();
+            // Reset all layers using proper Esri methods
+            this.resetAllLayerFiltersEsri();
             
             // Reset the township selector
             if (this.townshipControl) {
@@ -1467,6 +1467,150 @@ class DeltaCountyApp {
                     this.filterLayerByTownship(layerConfig, townshipName);
                 }
             });
+        }
+    }
+    
+    // New Esri-based filtering methods for proper ArcGIS service querying
+    filterAllLayersByTownshipEsri(townshipName) {
+        console.log(`🌍 Filtering all layers by township using Esri queries: ${townshipName}`);
+        
+        let layersProcessed = 0;
+        let layersWithData = 0;
+        
+        // Process all Delta County layers
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            this.deltaCountyServiceManager.layers.forEach(layerConfig => {
+                if (layerConfig.leafletLayer && typeof L.esri !== 'undefined') {
+                    this.filterEsriLayerByTownship(layerConfig, townshipName, (hasData) => {
+                        layersProcessed++;
+                        if (hasData) layersWithData++;
+                        
+                        // Show final notification when all layers are processed
+                        if (layersProcessed === this.deltaCountyServiceManager.layers.length) {
+                            if (layersWithData > 0) {
+                                this.showQueryNotification(`Found data in ${layersWithData} layers for ${townshipName}`, 'success');
+                            } else {
+                                this.showQueryNotification(`No data found in ${townshipName} township`, 'warning');
+                            }
+                        }
+                    });
+                }
+            });
+        }
+        
+        // Also process UW Madison layers if available
+        if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+            this.uwMadisonServiceManager.layers.forEach(layerConfig => {
+                if (layerConfig.leafletLayer && typeof L.esri !== 'undefined') {
+                    this.filterEsriLayerByTownship(layerConfig, townshipName, () => {});
+                }
+            });
+        }
+    }
+    
+    filterEsriLayerByTownship(layerConfig, townshipName, callback) {
+        console.log(`🔍 Filtering ${layerConfig.name} by township: ${townshipName}`);
+        
+        try {
+            // Check if this is an Esri feature layer with query capability
+            if (layerConfig.leafletLayer && layerConfig.leafletLayer.setDefinitionExpression) {
+                console.log(`✅ Using setDefinitionExpression for ${layerConfig.name}`);
+                
+                // Build where clause for township filtering
+                // Try multiple possible field names for township
+                const whereClause = this.buildTownshipWhereClause(townshipName);
+                
+                console.log(`📝 Setting definition expression: ${whereClause}`);
+                layerConfig.leafletLayer.setDefinitionExpression(whereClause);
+                
+                // Store the original definition for reset
+                if (!layerConfig.originalDefinitionExpression) {
+                    layerConfig.originalDefinitionExpression = '';
+                }
+                
+                callback(true);
+                
+            } else if (layerConfig.leafletLayer && layerConfig.leafletLayer.query) {
+                console.log(`✅ Using query method for ${layerConfig.name}`);
+                
+                // Use query to filter features
+                const whereClause = this.buildTownshipWhereClause(townshipName);
+                
+                layerConfig.leafletLayer.query()
+                    .where(whereClause)
+                    .run((error, featureCollection) => {
+                        if (error) {
+                            console.error(`❌ Query error for ${layerConfig.name}:`, error);
+                            callback(false);
+                            return;
+                        }
+                        
+                        if (featureCollection && featureCollection.features && featureCollection.features.length > 0) {
+                            console.log(`✅ Found ${featureCollection.features.length} features in ${layerConfig.name} for ${townshipName}`);
+                            callback(true);
+                        } else {
+                            console.log(`⚠️ No features found in ${layerConfig.name} for ${townshipName}`);
+                            callback(false);
+                        }
+                    });
+                    
+            } else {
+                console.log(`⚠️ ${layerConfig.name} does not support Esri queries, skipping`);
+                callback(false);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error filtering ${layerConfig.name}:`, error);
+            callback(false);
+        }
+    }
+    
+    buildTownshipWhereClause(townshipName) {
+        // Use the 'Name' field specifically for township filtering
+        // This provides exact matching for township names
+        console.log(`🏷️ Building where clause for township: ${townshipName} using 'Name' field`);
+        
+        // Primary condition using exact match on Name field
+        const exactMatch = `UPPER(Name) = UPPER('${townshipName}')`;
+        
+        // Fallback condition using partial match for flexibility
+        const partialMatch = `UPPER(Name) LIKE UPPER('%${townshipName}%')`;
+        
+        // Try exact match first, then partial match
+        const whereClause = `${exactMatch} OR ${partialMatch}`;
+        
+        console.log(`📝 Generated where clause: ${whereClause}`);
+        return whereClause;
+    }
+    
+    resetAllLayerFiltersEsri() {
+        console.log('🔄 Resetting all layer filters using Esri methods');
+        
+        try {
+            // Reset Delta County layers
+            if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+                this.deltaCountyServiceManager.layers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer && layerConfig.leafletLayer.setDefinitionExpression) {
+                        console.log(`🔄 Resetting definition expression for ${layerConfig.name}`);
+                        layerConfig.leafletLayer.setDefinitionExpression(layerConfig.originalDefinitionExpression || '');
+                    }
+                });
+            }
+            
+            // Reset UW Madison layers
+            if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+                this.uwMadisonServiceManager.layers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer && layerConfig.leafletLayer.setDefinitionExpression) {
+                        console.log(`🔄 Resetting definition expression for ${layerConfig.name}`);
+                        layerConfig.leafletLayer.setDefinitionExpression(layerConfig.originalDefinitionExpression || '');
+                    }
+                });
+            }
+            
+            console.log('✅ All layer filters reset');
+            
+        } catch (error) {
+            console.error('❌ Error resetting layer filters:', error);
         }
     }
     
@@ -1564,13 +1708,20 @@ class DeltaCountyApp {
     }
     
     showQueryNotification(message, type = 'info') {
+        const colors = {
+            'success': '#27ae60',
+            'error': '#e74c3c', 
+            'warning': '#f39c12',
+            'info': '#3498db'
+        };
+        
         const notification = $(`
             <div style="
                 position: fixed;
                 top: 20px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+                background: ${colors[type] || colors.info};
                 color: white;
                 padding: 12px 20px;
                 border-radius: 6px;
@@ -1586,10 +1737,11 @@ class DeltaCountyApp {
         
         $('body').append(notification);
         
-        // Auto-remove after 3 seconds
+        // Auto-remove after 4 seconds for warnings, 3 seconds for others
+        const delay = type === 'warning' ? 4000 : 3000;
         setTimeout(() => {
             notification.fadeOut(() => notification.remove());
-        }, 3000);
+        }, delay);
     }
     
     resetView() {
