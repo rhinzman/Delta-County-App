@@ -234,6 +234,22 @@ main {
     display: none;
 }
 
+/* Remove any shadows from circle markers */
+.leaflet-container .leaflet-interactive {
+    stroke-width: 0 !important;
+}
+
+.leaflet-container path {
+    filter: none !important;
+    -webkit-filter: none !important;
+}
+
+/* Specifically target circle markers to remove stroke */
+.leaflet-container svg circle {
+    stroke: none !important;
+    stroke-width: 0 !important;
+}
+
 .leaflet-popup-content-wrapper {
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
