@@ -158,9 +158,9 @@ class UWMadisonServiceManager {
                 opacity: 0.8
             },
             'esriGeometryPolyline': {
-                color: this.getColorForIndex(index),
-                weight: 3,
-                opacity: 0.8
+                color: '#000000',
+                weight: 2,
+                opacity: 1
             },
             'esriGeometryPoint': {
                 // Simple blue dot for address points without shadow/border

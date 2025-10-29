@@ -234,20 +234,38 @@ main {
     display: none;
 }
 
-/* Remove any shadows from circle markers */
+/* Complete removal of shadows and strokes from all Leaflet circle markers */
 .leaflet-container .leaflet-interactive {
+    stroke: none !important;
     stroke-width: 0 !important;
+    stroke-opacity: 0 !important;
 }
 
 .leaflet-container path {
     filter: none !important;
     -webkit-filter: none !important;
+    stroke: none !important;
+    stroke-width: 0 !important;
 }
 
-/* Specifically target circle markers to remove stroke */
+/* Specifically target circle markers to remove all stroke effects */
 .leaflet-container svg circle {
     stroke: none !important;
     stroke-width: 0 !important;
+    stroke-opacity: 0 !important;
+}
+
+/* Override any Leaflet default shadow styles */
+.leaflet-container .leaflet-marker-shadow,
+.leaflet-container .leaflet-zoom-box {
+    display: none !important;
+}
+
+/* Remove any box-shadow from interactive elements */
+.leaflet-container .leaflet-interactive {
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    -moz-box-shadow: none !important;
 }
 
 .leaflet-popup-content-wrapper {

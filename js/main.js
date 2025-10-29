@@ -483,15 +483,20 @@ class DeltaCountyApp {
         // Check if this layer is one of our 4 allowed layers
         const normalizedName = layerName.toLowerCase().replace(/[🏠🏞️🛣️📄🏛️]/g, '').trim();
         
+        console.log(`🔍 Checking layer: "${layerName}" -> normalized: "${normalizedName}"`);
+        
         if (normalizedName.includes('township')) return 'townships';
         if (normalizedName.includes('parcel')) return 'parcels';
         if (normalizedName.includes('road') || normalizedName.includes('centerline')) return 'roads';
         if (normalizedName.includes('address')) return 'address_points';
         
+        console.log(`❌ Layer "${layerName}" not recognized as allowed layer`);
         return null;
     }
     
     addLayerToCustomControl(layer, layerName, layerType) {
+        console.log(`🎯 Attempting to add layer to control: "${layerName}" as type "${layerType}"`);
+        
         // Only add if we don't already have this layer type
         if (!this.allowedLayers[layerType]) {
             this.allowedLayers[layerType] = layer;
@@ -509,7 +514,7 @@ class DeltaCountyApp {
             this.layerControl.addOverlay(layer, displayName);
             console.log(`✅ Added to custom control: ${displayName}`);
         } else {
-            console.log(`⏭️ Skipping duplicate layer type: ${layerType}`);
+            console.log(`⏭️ Skipping duplicate layer type: ${layerType} (already have: ${this.allowedLayers[layerType] ? 'yes' : 'no'})`);
         }
     }
     

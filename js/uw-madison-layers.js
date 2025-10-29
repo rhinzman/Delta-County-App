@@ -298,9 +298,9 @@ class DeltaCountyLayerManager {
                 };
             case 'esriGeometryPolyline':
                 return {
-                    color: '#3388ff',
-                    weight: 3,
-                    opacity: 0.8
+                    color: '#000000',
+                    weight: 2,
+                    opacity: 1
                 };
             case 'esriGeometryPolygon':
                 return {

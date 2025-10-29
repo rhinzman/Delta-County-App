@@ -49,6 +49,8 @@ class DeltaCountyServiceManager {
         console.log('🔧 Processing Delta County service layers...');
 
         layers.forEach(layerInfo => {
+            console.log(`🔍 Processing layer: ${layerInfo.name} (ID: ${layerInfo.id})`);
+            
             // Only include the 4 specific layers we want
             const allowedLayers = [
                 'Site_Structure_Address_Points_Delta_County',
@@ -61,6 +63,8 @@ class DeltaCountyServiceManager {
                 console.log(`⏭️ Skipping layer: ${layerInfo.name} (not in allowed list)`);
                 return;
             }
+            
+            console.log(`✅ Including layer: ${layerInfo.name}`);
             
             const layerConfig = {
                 id: `delta_county_${layerInfo.id}`,
@@ -93,8 +97,10 @@ class DeltaCountyServiceManager {
 
     shouldBeVisibleByDefault(layerInfo) {
         // Show some layers by default
-        const defaultVisible = ['Townships', 'parcels'];
-        return defaultVisible.includes(layerInfo.name);
+        const defaultVisible = ['Townships', 'parcels', 'Road_Centerlines_Delta_County'];
+        const isVisible = defaultVisible.includes(layerInfo.name);
+        console.log(`👁️ Layer ${layerInfo.name} visible by default: ${isVisible}`);
+        return isVisible;
     }
 
     getStyleForLayer(layerInfo) {
@@ -124,9 +130,9 @@ class DeltaCountyServiceManager {
                 fillOpacity: 0.8
             },
             'Road_Centerlines_Delta_County': {
-                color: '#231F20',
+                color: '#000000',
                 weight: 2,
-                opacity: 0.8
+                opacity: 1
             }
         };
         
@@ -146,9 +152,9 @@ class DeltaCountyServiceManager {
                 };
             case 'esriGeometryPolyline':
                 return {
-                    color: '#3388ff',
-                    weight: 3,
-                    opacity: 0.8
+                    color: '#000000',
+                    weight: 2,
+                    opacity: 1
                 };
             case 'esriGeometryPolygon':
                 return {

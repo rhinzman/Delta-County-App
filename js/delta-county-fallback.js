@@ -111,9 +111,9 @@ class DeltaCountyFallbackService {
                 fillOpacity: 0.8
             },
             'Roads': {
-                color: '#231F20',
+                color: '#000000',
                 weight: 2,
-                opacity: 0.8
+                opacity: 1
             }
         };
         
