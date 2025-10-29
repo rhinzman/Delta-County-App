@@ -78,6 +78,14 @@ class DeltaCountyServiceManager {
                 sourceService: 'Delta County GIS'
             };
 
+            console.log(`📋 Layer config created:`, {
+                name: layerConfig.name,
+                id: layerConfig.id,
+                visible: layerConfig.visible,
+                url: layerConfig.url,
+                style: layerConfig.style
+            });
+
             this.layers.push(layerConfig);
             console.log(`📋 Configured layer: ${layerConfig.name}`);
         });
@@ -203,12 +211,14 @@ class DeltaCountyServiceManager {
             'Site_Structure_Address_Points_Delta_County': {
                 title: '🏠 Address: {FULL_ADDRESS}',
                 content: `
-                    <div style="padding: 10px; font-family: Arial, sans-serif;">
-                        <h4 style="margin-top: 0; color: #3F612D;">Address Information</h4>
-                        <p><strong>Address:</strong> {FULL_ADDRESS}</p>
-                        <p><strong>City:</strong> {CITY}</p>
-                        <p><strong>State:</strong> {STATE}</p>
-                        <p><strong>ZIP:</strong> {ZIP}</p>
+                    <div style="padding: 10px; font-family: Arial, sans-serif; max-width: 300px;">
+                        <h4 style="margin-top: 0; color: #3498db; border-bottom: 1px solid #ddd; padding-bottom: 5px;">Address Information</h4>
+                        <p><strong>📍 Address:</strong> {FULL_ADDRESS}</p>
+                        <p><strong>🏙️ City:</strong> {CITY}</p>
+                        <p><strong>🏛️ State:</strong> {STATE}</p>
+                        <p><strong>📮 ZIP Code:</strong> {ZIP}</p>
+                        <p><strong>🏞️ Township:</strong> {TOWNSHIP}</p>
+                        <p><small style="color: #666;">Click to view address details</small></p>
                     </div>
                 `
             },

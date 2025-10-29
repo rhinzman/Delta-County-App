@@ -124,6 +124,9 @@ class DeltaCountyApp {
             // Add to map if visible by default
             if (layerConfig.visible) {
                 layer.addTo(this.map);
+                console.log(`✅ Layer added to map: ${layerConfig.name} (visible by default)`);
+            } else {
+                console.log(`⏸️ Layer NOT added to map: ${layerConfig.name} (not visible by default)`);
             }
             
             // Store layer reference
@@ -160,11 +163,13 @@ class DeltaCountyApp {
         if (DeltaCountyConfig.interaction.enablePopups && layerConfig.popupTemplate) {
             const popupContent = this.formatPopupContent(feature.properties, layerConfig.popupTemplate);
             layer.bindPopup(popupContent);
+            console.log(`🔗 Popup bound for feature in ${layerConfig.name}`);
         }
         
         // Setup click interaction for selection
         if (DeltaCountyConfig.interaction.enableSelection) {
             layer.on('click', (e) => {
+                console.log(`🖱️ Feature clicked in ${layerConfig.name}:`, feature.properties);
                 this.selectFeature(e.target, layerConfig);
                 this.showFeatureInfo(feature.properties, layerConfig);
                 L.DomEvent.stopPropagation(e);
@@ -467,6 +472,12 @@ class DeltaCountyApp {
             collapsed: false
         }).addTo(this.map);
         
+        // Add event listeners to update legend when layers are toggled
+        this.map.on('overlayadd overlayremove', () => {
+            // Small delay to ensure the layer state has updated
+            setTimeout(() => this.updateLegend(), 100);
+        });
+        
         // Initialize layer names tracker for preventing duplicates
         this.addedLayerNames = new Set();
         
@@ -513,6 +524,9 @@ class DeltaCountyApp {
             
             this.layerControl.addOverlay(layer, displayName);
             console.log(`✅ Added to custom control: ${displayName}`);
+            
+            // Update legend when new layer is added
+            this.updateLegend();
         } else {
             console.log(`⏭️ Skipping duplicate layer type: ${layerType} (already have: ${this.allowedLayers[layerType] ? 'yes' : 'no'})`);
         }
@@ -525,43 +539,62 @@ class DeltaCountyApp {
             const div = L.DomUtil.create('div', 'legend');
             div.innerHTML = '<h4>Map Layers</h4>';
             
-            // Add Delta County layers
-            if (this.deltaCountyService && this.deltaCountyService.layers) {
-                this.deltaCountyService.layers.forEach(layerConfig => {
-                    if (layerConfig.visible && layerConfig.leafletLayer) {
-                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#2E86AB';
-                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>${layerConfig.name}</span><br>`;
-                    }
-                });
-            }
+            // Define the 4 main layer types with their styling
+            const layerTypes = [
+                {
+                    name: '🏞️ Townships',
+                    type: 'polygon',
+                    color: '#2E86AB',
+                    fillColor: '#A23B72',
+                    layer: this.allowedLayers.townships
+                },
+                {
+                    name: '📄 Parcels',
+                    type: 'polygon', 
+                    color: '#F18F01',
+                    fillColor: '#C73E1D',
+                    layer: this.allowedLayers.parcels
+                },
+                {
+                    name: '🛣️ Road Centerlines',
+                    type: 'line',
+                    color: '#000000',
+                    layer: this.allowedLayers.roads
+                },
+                {
+                    name: '🏠 Address Points',
+                    type: 'point',
+                    color: '#3498db',
+                    layer: this.allowedLayers.address_points
+                }
+            ];
             
-            // Add UW-Madison layers
-            if (this.uwMadisonService && this.uwMadisonService.layers) {
-                this.uwMadisonService.layers.forEach(layerConfig => {
-                    if (layerConfig.leafletLayer) {
-                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#A23B72';
-                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>🏛️ ${layerConfig.name}</span><br>`;
+            // Add each layer type to legend if it exists and is on the map
+            layerTypes.forEach(layerDef => {
+                if (layerDef.layer && this.map.hasLayer(layerDef.layer)) {
+                    let symbolHtml = '';
+                    
+                    switch(layerDef.type) {
+                        case 'polygon':
+                            symbolHtml = `<i style="background: ${layerDef.fillColor}; border: 2px solid ${layerDef.color}; opacity: 0.7;"></i>`;
+                            break;
+                        case 'line':
+                            symbolHtml = `<i style="background: ${layerDef.color}; border: none; height: 3px; margin-top: 7px; width: 18px; display: inline-block;"></i>`;
+                            break;
+                        case 'point':
+                            symbolHtml = `<i style="background: ${layerDef.color}; border: none; border-radius: 50%; width: 12px; height: 12px; margin-top: 3px;"></i>`;
+                            break;
                     }
-                });
-            }
-            
-            // Add any manual layers from UW service
-            if (this.uwMadisonService && this.uwMadisonService.manualLayers) {
-                this.uwMadisonService.manualLayers.forEach(layerConfig => {
-                    if (layerConfig.leafletLayer) {
-                        const color = layerConfig.style?.color || layerConfig.style?.fillColor || '#F18F01';
-                        div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>🏛️ ${layerConfig.name}</span><br>`;
-                    }
-                });
-            }
-            
-            // Add any other layers from the original config
-            DeltaCountyConfig.layers.forEach(layerConfig => {
-                if (layerConfig.visible) {
-                    const color = layerConfig.style?.color || '#85929E';
-                    div.innerHTML += `<i style="background: ${color}; border: 1px solid #333;"></i><span>${layerConfig.name}</span><br>`;
+                    
+                    div.innerHTML += `${symbolHtml}<span>${layerDef.name}</span><br>`;
                 }
             });
+            
+            // If no layers are visible, show a message
+            const visibleLayers = layerTypes.filter(l => l.layer && this.map.hasLayer(l.layer));
+            if (visibleLayers.length === 0) {
+                div.innerHTML += '<span style="color: #666; font-style: italic;">No layers currently visible</span>';
+            }
             
             return div;
         };
@@ -1195,7 +1228,7 @@ class DeltaCountyApp {
                     },
                     onEachFeature: (feature, pointLayer) => {
                         if (layer.popupTemplate) {
-                            const popupContent = this.populateTemplate(layer.popupTemplate.content, feature.properties);
+                            const popupContent = this.formatPopupContent(feature.properties, layer.popupTemplate);
                             pointLayer.bindPopup(popupContent);
                         }
                     }
