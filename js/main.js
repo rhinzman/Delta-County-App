@@ -13,6 +13,10 @@ class DeltaCountyApp {
         this.deltaCountyServiceManager = null;
         this.uwMadisonServiceManager = null;
         
+        // Service initialization flags to prevent duplicates
+        this.deltaCountyServiceInitialized = false;
+        this.uwMadisonServiceInitialized = false;
+        
         this.init();
     }
     
@@ -235,6 +239,12 @@ class DeltaCountyApp {
     }
     
     async initializeDeltaCountyService() {
+        // Prevent multiple initializations
+        if (this.deltaCountyServiceInitialized) {
+            console.log('🔄 Delta County service already initialized, skipping...');
+            return;
+        }
+        
         console.log('Initializing Delta County Service...');
         this.showLoading();
         
@@ -269,6 +279,9 @@ class DeltaCountyApp {
                 this.updateLegend();
             }
             
+            // Mark as initialized
+            this.deltaCountyServiceInitialized = true;
+            
             // Now that layers are loaded, add the township selector if it should be shown
             if (DeltaCountyConfig.ui.showTownshipSelector && !this.townshipControl) {
                 console.log('🏞️ Adding township selector after service initialization');
@@ -283,6 +296,12 @@ class DeltaCountyApp {
     }
     
     async initializeUWMadisonService() {
+        // Prevent multiple initializations
+        if (this.uwMadisonServiceInitialized) {
+            console.log('🔄 UW-Madison service already initialized, skipping...');
+            return;
+        }
+        
         console.log('🏛️ Initializing UW-Madison Service...');
         
         // Check if Esri Leaflet is available
@@ -321,6 +340,9 @@ class DeltaCountyApp {
                 this.updateLegend();
             }
             
+            // Mark as initialized
+            this.uwMadisonServiceInitialized = true;
+            
         } catch (error) {
             console.error('❌ Failed to initialize UW-Madison Service:', error);
         }
@@ -328,6 +350,11 @@ class DeltaCountyApp {
     
     async retryUWMadisonService() {
         console.log('🔄 Retrying UW-Madison Service initialization...');
+        
+        if (this.uwMadisonServiceInitialized) {
+            console.log('✅ UW-Madison service already initialized, skipping retry');
+            return;
+        }
         
         if (typeof L.esri !== 'undefined') {
             console.log('✅ Esri Leaflet now available, proceeding with UW-Madison initialization');
@@ -379,12 +406,17 @@ class DeltaCountyApp {
     async retryDeltaCountyService() {
         console.log('🔄 Retrying Delta County Service initialization...');
         
+        if (this.deltaCountyServiceInitialized) {
+            console.log('✅ Delta County service already initialized, skipping retry');
+            return;
+        }
+        
         if (typeof L.esri !== 'undefined') {
             console.log('✅ Esri Leaflet now available, proceeding with initialization');
             this.initializeDeltaCountyService();
         } else {
             console.error('❌ Esri Leaflet still not available after retry');
-            console.log('� Switching to fallback GeoJSON service...');
+            console.log('🔄 Switching to fallback GeoJSON service...');
             
             // Try fallback service
             if (typeof DeltaCountyFallbackService !== 'undefined') {

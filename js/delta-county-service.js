@@ -49,6 +49,12 @@ class DeltaCountyServiceManager {
         console.log('🔧 Processing Delta County service layers...');
 
         layers.forEach(layerInfo => {
+            // Skip Road_Centerlines_Delta_County layer
+            if (layerInfo.name === 'Road_Centerlines_Delta_County') {
+                console.log(`⏭️ Skipping layer: ${layerInfo.name}`);
+                return;
+            }
+            
             const layerConfig = {
                 id: `delta_county_${layerInfo.id}`,
                 name: this.formatLayerName(layerInfo.name),
@@ -70,7 +76,6 @@ class DeltaCountyServiceManager {
         // Clean up layer names for better display
         const nameMap = {
             'Site_Structure_Address_Points_Delta_County': '🏠 Address Points',
-            'Road_Centerlines_Delta_County': '🛣️ Roads',
             'parcels': '📄 Parcels',
             'Townships': '🏞️ Townships'
         };
@@ -109,11 +114,6 @@ class DeltaCountyServiceManager {
                 weight: 1,
                 opacity: 1,
                 fillOpacity: 0.8
-            },
-            'Road_Centerlines_Delta_County': {
-                color: '#231F20',
-                weight: 2,
-                opacity: 0.8
             }
         };
         
@@ -190,17 +190,6 @@ class DeltaCountyServiceManager {
                         <p><strong>City:</strong> {CITY}</p>
                         <p><strong>State:</strong> {STATE}</p>
                         <p><strong>ZIP:</strong> {ZIP}</p>
-                    </div>
-                `
-            },
-            'Road_Centerlines_Delta_County': {
-                title: '🛣️ Road: {ROAD_NAME}',
-                content: `
-                    <div style="padding: 10px; font-family: Arial, sans-serif;">
-                        <h4 style="margin-top: 0; color: #231F20;">Road Information</h4>
-                        <p><strong>Road Name:</strong> {ROAD_NAME}</p>
-                        <p><strong>Type:</strong> {ROAD_TYPE}</p>
-                        <p><strong>Surface:</strong> {SURFACE}</p>
                     </div>
                 `
             }
