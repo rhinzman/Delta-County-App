@@ -36,7 +36,150 @@
            title="Open Field Collection App">
             📱 Field Collection
         </a>
-        
+        <!-- add query layer button -->
+        <button id="query-layer-btn" class="query-layer-btn" title="Query Layer">
+            🔍 Query Layer
+        </button>
+    --- IGNORE ---
+    --- IGNORE ---
+    <div id="query-results"></div>
+    --- IGNORE ---
+    <script>
+        $(document).ready(function() {
+            console.log('🔍 Checking for query button...');
+            const queryBtn = $('#query-layer-btn');
+            console.log('Query button found:', queryBtn.length > 0);
+            console.log('Query button element:', queryBtn);
+            
+            if (queryBtn.length === 0) {
+                console.error('❌ Query button not found in DOM!');
+            } else {
+                console.log('✅ Query button found, setting up click handler');
+                console.log('Button styles:', {
+                    position: queryBtn.css('position'),
+                    bottom: queryBtn.css('bottom'),
+                    right: queryBtn.css('right'),
+                    display: queryBtn.css('display'),
+                    visibility: queryBtn.css('visibility'),
+                    zIndex: queryBtn.css('z-index')
+                });
+            }
+            
+            $('#query-layer-btn').on('click', function() {
+                console.log('🔍 Query Layer button clicked!');
+                showTownshipQueryDialog();
+            });
+            
+            // Township query dialog function
+            function showTownshipQueryDialog() {
+                // Create a simple dialog for township selection
+                const townshipList = [
+                    "Baldwin", "Ford River", "Garden", "Maple Ridge", "Masonville",
+                    "Nahma", "Rapid River", "Wells", "Bark River", "Escanaba",
+                    "Gladstone", "Bay De Noc", "Fairbanks", "Ensign", "Brampton", "Cornell"
+                ];
+                
+                const dialog = $(`
+                    <div id="township-query-dialog" style="
+                        position: fixed; 
+                        top: 50%; 
+                        left: 50%; 
+                        transform: translate(-50%, -50%);
+                        background: white;
+                        padding: 20px;
+                        border-radius: 10px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                        z-index: 2000;
+                        min-width: 300px;
+                        max-width: 400px;
+                    ">
+                        <h3 style="margin-top: 0; color: #27ae60;">🔍 Query by Township</h3>
+                        <p>Select a township to filter all layers:</p>
+                        <select id="township-query-select" style="
+                            width: 100%;
+                            padding: 8px;
+                            margin: 10px 0;
+                            border: 1px solid #ccc;
+                            border-radius: 4px;
+                            font-size: 14px;
+                        ">
+                            <option value="">-- Select Township --</option>
+                            ${townshipList.map(township => `<option value="${township}">${township}</option>`).join('')}
+                        </select>
+                        <div style="text-align: right; margin-top: 15px;">
+                            <button id="query-cancel-btn" style="
+                                padding: 8px 16px;
+                                margin-right: 10px;
+                                border: 1px solid #ccc;
+                                background: white;
+                                border-radius: 4px;
+                                cursor: pointer;
+                            ">Cancel</button>
+                            <button id="query-apply-btn" style="
+                                padding: 8px 16px;
+                                background: #27ae60;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                            ">Apply Filter</button>
+                            <button id="query-reset-btn" style="
+                                padding: 8px 16px;
+                                margin-left: 5px;
+                                background: #e74c3c;
+                                color: white;
+                                border: none;
+                                border-radius: 4px;
+                                cursor: pointer;
+                            ">Reset</button>
+                        </div>
+                    </div>
+                    <div id="dialog-backdrop" style="
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        z-index: 1999;
+                    "></div>
+                `);
+                
+                $('body').append(dialog);
+                
+                // Event handlers
+                $('#query-cancel-btn, #dialog-backdrop').on('click', function() {
+                    $('#township-query-dialog, #dialog-backdrop').remove();
+                });
+                
+                $('#query-apply-btn').on('click', function() {
+                    const selectedTownship = $('#township-query-select').val();
+                    if (selectedTownship) {
+                        console.log(`🔍 Applying township filter: ${selectedTownship}`);
+                        if (window.app && window.app.filterByTownship) {
+                            window.app.filterByTownship(selectedTownship);
+                        } else {
+                            alert(`Filtering by ${selectedTownship} township.\nNote: Connect this to your main app filtering system.`);
+                        }
+                    } else {
+                        alert('Please select a township first.');
+                        return;
+                    }
+                    $('#township-query-dialog, #dialog-backdrop').remove();
+                });
+                
+                $('#query-reset-btn').on('click', function() {
+                    console.log('🔄 Resetting township filter');
+                    if (window.app && window.app.resetTownshipFilter) {
+                        window.app.resetTownshipFilter();
+                    } else {
+                        alert('Resetting township filter.\nNote: Connect this to your main app reset system.');
+                    }
+                    $('#township-query-dialog, #dialog-backdrop').remove();
+                });
+            }
+        });
+    </script>
     </main>
     
     <footer>

@@ -108,6 +108,13 @@ class DeltaCountyServiceManager {
         const defaultVisible = ['Townships', 'parcels', 'Road_Centerlines_Delta_County'];
         const isVisible = defaultVisible.includes(layerInfo.name);
         console.log(`👁️ Layer ${layerInfo.name} visible by default: ${isVisible}`);
+        
+        // FORCE roads to be visible for debugging
+        if (layerInfo.name === 'Road_Centerlines_Delta_County') {
+            console.log(`🛣️ FORCING Road_Centerlines_Delta_County to be visible!`);
+            return true;
+        }
+        
         return isVisible;
     }
 

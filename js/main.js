@@ -46,6 +46,9 @@ class DeltaCountyApp {
         this.addBaseLayers();
         
         console.log('Map initialized for Delta County GIS App');
+        
+        // Make app accessible globally for query functions
+        window.app = this;
     }
     
     addBaseLayers() {
@@ -275,6 +278,58 @@ class DeltaCountyApp {
             this.deltaCountyServiceManager = new DeltaCountyServiceManager(this.map);
             const deltaLayers = await this.deltaCountyServiceManager.initialize();
             
+            // Add a global function to manually try loading roads
+            window.forceLoadRoads = () => {
+                console.log('🛣️ FORCING ROAD LAYER LOAD...');
+                
+                if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+                    const roadLayer = this.deltaCountyServiceManager.layers.find(layer => 
+                        layer.name.toLowerCase().includes('road') || layer.name.toLowerCase().includes('centerline'));
+                    
+                    if (roadLayer) {
+                        console.log(`Found road layer: ${roadLayer.name}`);
+                        
+                        if (!roadLayer.leafletLayer || !this.map.hasLayer(roadLayer.leafletLayer)) {
+                            console.log('Creating/adding road layer manually...');
+                            
+                            try {
+                                // Create new Esri feature layer
+                                const layer = L.esri.featureLayer({
+                                    url: roadLayer.url,
+                                    style: roadLayer.style
+                                });
+                                
+                                layer.on('load', () => {
+                                    console.log('✅ Road layer loaded successfully!');
+                                });
+                                
+                                layer.on('error', (error) => {
+                                    console.error('❌ Road layer failed to load:', error);
+                                });
+                                
+                                roadLayer.leafletLayer = layer;
+                                layer.addTo(this.map);
+                                
+                                // Add to layer control if not already there
+                                if (!this.allowedLayers.roads) {
+                                    this.addLayerToCustomControl(layer, roadLayer.name, 'roads');
+                                }
+                                
+                                console.log('Road layer manually added to map');
+                            } catch (error) {
+                                console.error('Error creating road layer:', error);
+                            }
+                        } else {
+                            console.log('Road layer already exists and is on map');
+                        }
+                    } else {
+                        console.error('No road layer found in service');
+                    }
+                } else {
+                    console.error('No Delta County service available');
+                }
+            };
+
             console.log(`Successfully integrated ${deltaLayers.length} Delta County layers`);
             console.log('📊 Layer Summary:');
             deltaLayers.forEach(layer => {
@@ -478,8 +533,46 @@ class DeltaCountyApp {
             this.addLegend();
         }
         
-        // Township selector will be added after Delta County service loads
-        // to ensure the township layer is available
+        // Debug: Add a global function to check road layer status
+        window.debugRoadLayers = () => {
+            console.log('🛣️ ROAD LAYER DEBUG REPORT:');
+            
+            // Check Delta County service
+            if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+                console.log('📋 Delta County Service Layers:');
+                this.deltaCountyServiceManager.layers.forEach(layer => {
+                    if (layer.name.toLowerCase().includes('road') || layer.name.toLowerCase().includes('centerline')) {
+                        console.log(`   🛣️ Found road layer: ${layer.name}`);
+                        console.log(`      - Visible: ${layer.visible}`);
+                        console.log(`      - Has Leaflet Layer: ${!!layer.leafletLayer}`);
+                        console.log(`      - On Map: ${layer.leafletLayer ? this.map.hasLayer(layer.leafletLayer) : 'N/A'}`);
+                        console.log(`      - Style:`, layer.style);
+                        console.log(`      - URL: ${layer.url}`);
+                    }
+                });
+            }
+            
+            // Check layer control
+            console.log('🎛️ Layer Control Status:');
+            console.log(`   Roads in allowedLayers: ${!!this.allowedLayers.roads}`);
+            if (this.allowedLayers.roads) {
+                console.log(`   Roads on map: ${this.map.hasLayer(this.allowedLayers.roads)}`);
+            }
+            
+            // Check all map layers
+            console.log('🗺️ All layers on map:');
+            let layerCount = 0;
+            this.map.eachLayer(layer => {
+                layerCount++;
+                console.log(`   ${layerCount}: ${layer.constructor.name}`);
+            });
+        };
+        
+        // Auto-run debug after 5 seconds
+        setTimeout(() => {
+            window.debugRoadLayers();
+        }, 5000);
+
         console.log('📋 Basic controls setup complete, township selector will be added after service initialization');
     }
     
@@ -1304,6 +1397,199 @@ class DeltaCountyApp {
         } catch (error) {
             console.error('❌ Error resetting address point filter:', error);
         }
+    }
+    
+    // Query button township filtering methods
+    filterByTownship(townshipName) {
+        console.log(`🔍 Query filter: Filtering all layers by township: ${townshipName}`);
+        
+        try {
+            // Store the current query filter
+            this.currentQueryFilter = townshipName;
+            
+            // Filter all applicable layers
+            this.filterAllLayersByTownship(townshipName);
+            
+            // Update the township selector to match
+            if (this.townshipControl) {
+                const select = this.townshipControl.getContainer().querySelector('select');
+                if (select) {
+                    select.value = townshipName;
+                }
+            }
+            
+            // Show notification
+            this.showQueryNotification(`Filtered to ${townshipName} township`, 'success');
+            
+        } catch (error) {
+            console.error('❌ Error applying township query filter:', error);
+            this.showQueryNotification('Error applying filter', 'error');
+        }
+    }
+    
+    resetTownshipFilter() {
+        console.log('🔄 Query filter: Resetting township filter');
+        
+        try {
+            // Clear the current filter
+            this.currentQueryFilter = null;
+            
+            // Reset all layers
+            this.resetAllLayerFilters();
+            
+            // Reset the township selector
+            if (this.townshipControl) {
+                const select = this.townshipControl.getContainer().querySelector('select');
+                if (select) {
+                    select.value = 'Choose a Township';
+                }
+            }
+            
+            // Show notification
+            this.showQueryNotification('Filter reset - showing all features', 'info');
+            
+        } catch (error) {
+            console.error('❌ Error resetting township query filter:', error);
+            this.showQueryNotification('Error resetting filter', 'error');
+        }
+    }
+    
+    filterAllLayersByTownship(townshipName) {
+        console.log(`🌍 Filtering all layers by township: ${townshipName}`);
+        
+        // Filter address points (reuse existing method)
+        this.filterAddressPointsByTownship(townshipName);
+        
+        // Filter other layers that have township information
+        if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+            this.deltaCountyServiceManager.layers.forEach(layerConfig => {
+                if (layerConfig.leafletLayer && layerConfig.name.toLowerCase().includes('parcel')) {
+                    this.filterLayerByTownship(layerConfig, townshipName);
+                }
+            });
+        }
+    }
+    
+    filterLayerByTownship(layerConfig, townshipName) {
+        console.log(`🔍 Filtering ${layerConfig.name} by township: ${townshipName}`);
+        
+        try {
+            if (!layerConfig.leafletLayer || typeof layerConfig.leafletLayer.eachLayer !== 'function') {
+                console.log(`⚠️ Cannot filter ${layerConfig.name} - not a feature layer`);
+                return;
+            }
+            
+            // Store original layer if not already stored
+            if (!layerConfig.originalLeafletLayer) {
+                layerConfig.originalLeafletLayer = layerConfig.leafletLayer;
+            }
+            
+            // Remove current layer from map
+            if (this.map.hasLayer(layerConfig.leafletLayer)) {
+                this.map.removeLayer(layerConfig.leafletLayer);
+            }
+            
+            // Create filtered features array
+            const filteredFeatures = [];
+            
+            layerConfig.leafletLayer.eachLayer(feature => {
+                if (feature.feature && feature.feature.properties) {
+                    const props = feature.feature.properties;
+                    const township = props.TOWNSHIP || props.TOWN || props.TOWNSHIPNAME || props.TOWNSHIP_NAME || '';
+                    
+                    if (township.toLowerCase().includes(townshipName.toLowerCase())) {
+                        filteredFeatures.push(feature.feature);
+                    }
+                }
+            });
+            
+            if (filteredFeatures.length > 0) {
+                // Create new filtered layer
+                const filteredLayer = L.geoJSON(filteredFeatures, {
+                    style: layerConfig.style,
+                    onEachFeature: (feature, layer) => {
+                        if (layerConfig.popupTemplate) {
+                            const popupContent = this.formatPopupContent(feature.properties, layerConfig.popupTemplate);
+                            layer.bindPopup(popupContent);
+                        }
+                    }
+                });
+                
+                // Replace layer reference and add to map
+                layerConfig.leafletLayer = filteredLayer;
+                filteredLayer.addTo(this.map);
+                
+                console.log(`✅ Filtered ${layerConfig.name}: showing ${filteredFeatures.length} features in ${townshipName}`);
+            } else {
+                console.log(`⚠️ No features found in ${townshipName} for ${layerConfig.name}`);
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error filtering ${layerConfig.name} by township:`, error);
+        }
+    }
+    
+    resetAllLayerFilters() {
+        console.log('🔄 Resetting all layer filters');
+        
+        try {
+            // Reset address points
+            this.resetAddressPointFilter();
+            
+            // Reset other layers
+            if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+                this.deltaCountyServiceManager.layers.forEach(layerConfig => {
+                    if (layerConfig.originalLeafletLayer && layerConfig.leafletLayer !== layerConfig.originalLeafletLayer) {
+                        // Remove filtered layer
+                        if (this.map.hasLayer(layerConfig.leafletLayer)) {
+                            this.map.removeLayer(layerConfig.leafletLayer);
+                        }
+                        
+                        // Restore original layer
+                        layerConfig.leafletLayer = layerConfig.originalLeafletLayer;
+                        
+                        // Add back to map if it was visible
+                        if (layerConfig.visible) {
+                            layerConfig.leafletLayer.addTo(this.map);
+                        }
+                        
+                        console.log(`✅ Restored original layer: ${layerConfig.name}`);
+                    }
+                });
+            }
+            
+        } catch (error) {
+            console.error('❌ Error resetting layer filters:', error);
+        }
+    }
+    
+    showQueryNotification(message, type = 'info') {
+        const notification = $(`
+            <div style="
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: ${type === 'success' ? '#27ae60' : type === 'error' ? '#e74c3c' : '#3498db'};
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                z-index: 2001;
+                font-weight: 500;
+                max-width: 400px;
+                text-align: center;
+            ">
+                ${message}
+            </div>
+        `);
+        
+        $('body').append(notification);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            notification.fadeOut(() => notification.remove());
+        }, 3000);
     }
     
     resetView() {
