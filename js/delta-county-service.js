@@ -124,15 +124,16 @@ class DeltaCountyServiceManager {
             'Townships': {
                 color: '#2E86AB',
                 weight: 2,
-                fillColor: '#A23B72',
-                fillOpacity: 0.1,
-                opacity: 0.8
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                opacity: 0.8,
+                fill: false
             },
             'parcels': {
                 color: '#F18F01',
                 weight: 1,
-                fillColor: '#C73E1D',
-                fillOpacity: 0.2,
+                fillColor: 'transparent',
+                fillOpacity: 0,
                 opacity: 0.7
             },
             'Site_Structure_Address_Points_Delta_County': {
@@ -147,7 +148,8 @@ class DeltaCountyServiceManager {
             'Road_Centerlines_Delta_County': {
                 color: '#000000',
                 weight: 2,
-                opacity: 1
+                opacity: 1,
+                fill: false
             }
         };
         
@@ -192,18 +194,18 @@ class DeltaCountyServiceManager {
         // Create appropriate popup templates for each layer
         const templates = {
             'Townships': {
-                title: '🏞️ Township: {NAME}',
+                title: '🏞️ Township: {Label}',
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #2E86AB;">Township Information</h4>
-                        <p><strong>Name:</strong> {NAME}</p>
+                        <p><strong>Name:</strong> {Label}</p>
                         <p><strong>Type:</strong> {TYPE}</p>
                         <p><strong>County:</strong> Delta County, Michigan</p>
                     </div>
                 `
             },
             'parcels': {
-                title: '📄 Parcel: {PARCEL_ID}',
+                title: '📄 Parcel: {PARCEL_PIN}',
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #F18F01;">Property Information</h4>
@@ -230,11 +232,11 @@ class DeltaCountyServiceManager {
                 `
             },
             'Road_Centerlines_Delta_County': {
-                title: '🛣️ Road: {ROAD_NAME}',
+                title: '🛣️ Road: {Full_Street_Name}',
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #231F20;">Road Information</h4>
-                        <p><strong>Road Name:</strong> {ROAD_NAME}</p>
+                        <p><strong>Road Name:</strong> {Full_Street_Name}</p>
                         <p><strong>Type:</strong> {ROAD_TYPE}</p>
                         <p><strong>Surface:</strong> {SURFACE}</p>
                     </div>
@@ -330,13 +332,54 @@ class DeltaCountyServiceManager {
                     }
                 });
 
+                // Special handling for roads layer
+                if (layerConfig.name.includes('Road Centerlines')) {
+                    console.log(`🛣️ SPECIAL ROADS LAYER HANDLING:`);
+                    console.log(`   Creating roads layer with URL: ${layerConfig.url}`);
+                    console.log(`   Roads layer style:`, layerConfig.style);
+                    
+                    // Add extra event listeners for roads
+                    layer.on('requeststart', function() {
+                        console.log('🛣️ Roads layer: Request started');
+                    });
+                    
+                    layer.on('requestend', function() {
+                        console.log('🛣️ Roads layer: Request ended');
+                    });
+                    
+                    layer.on('requestsuccess', function(e) {
+                        console.log('🛣️ Roads layer: Request successful', e);
+                    });
+                    
+                    layer.on('requesterror', function(e) {
+                        console.error('🛣️ Roads layer: Request error', e);
+                    });
+                }
+
                 // Add error handling for layer loading
                 layer.on('error', function(error) {
                     console.error(`❌ Failed to load layer ${layerConfig.name}:`, error);
+                    if (layerConfig.name.includes('Road Centerlines')) {
+                        console.error('🛣️ ROADS LAYER FAILED TO LOAD!', error);
+                    }
                 });
 
                 layer.on('load', function() {
                     console.log(`✅ Successfully loaded layer: ${layerConfig.name}`);
+                    if (layerConfig.name.includes('Road Centerlines')) {
+                        console.log('🛣️ ROADS LAYER SUCCESSFULLY LOADED!');
+                        
+                        // Check if it has features
+                        setTimeout(() => {
+                            let featureCount = 0;
+                            if (typeof layer.eachLayer === 'function') {
+                                layer.eachLayer(() => featureCount++);
+                                console.log(`🛣️ Roads layer has ${featureCount} features`);
+                            } else {
+                                console.log('🛣️ Roads layer does not support eachLayer method');
+                            }
+                        }, 2000);
+                    }
                 });
 
                 layer.on('loading', function() {

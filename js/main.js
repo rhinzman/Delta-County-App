@@ -568,9 +568,288 @@ class DeltaCountyApp {
             });
         };
         
+        // Add manual roads layer creation function
+        window.createRoadsLayerManually = () => {
+            console.log('🛣️ MANUALLY CREATING ROADS LAYER...');
+            
+            // Try multiple potential URLs
+            const potentialUrls = [
+                'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer/2',
+                'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer/1',
+                'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer/3'
+            ];
+            
+            potentialUrls.forEach((url, index) => {
+                console.log(`🛣️ Trying URL ${index + 1}: ${url}`);
+                
+                try {
+                    const roadsLayer = L.esri.featureLayer({
+                        url: url,
+                        style: {
+                            color: index === 0 ? '#ff0000' : index === 1 ? '#00ff00' : '#0000ff', // Different colors for testing
+                            weight: 5, // Very thick for visibility
+                            opacity: 1
+                        }
+                    });
+                    
+                    roadsLayer.on('loading', () => {
+                        console.log(`🛣️ Manual roads layer ${index + 1}: Loading...`);
+                    });
+                    
+                    roadsLayer.on('load', () => {
+                        console.log(`🛣️ Manual roads layer ${index + 1}: Loaded successfully!`);
+                        
+                        // Check if it has features
+                        setTimeout(() => {
+                            let hasFeatures = false;
+                            try {
+                                if (roadsLayer.getLayers && roadsLayer.getLayers().length > 0) {
+                                    hasFeatures = true;
+                                    console.log(`✅ URL ${index + 1} HAS FEATURES: ${roadsLayer.getLayers().length} features`);
+                                } else {
+                                    console.log(`⚠️ URL ${index + 1} has no features`);
+                                }
+                            } catch (e) {
+                                console.log(`⚠️ Could not check features for URL ${index + 1}`);
+                            }
+                        }, 3000);
+                    });
+                    
+                    roadsLayer.on('error', (error) => {
+                        console.error(`🛣️ Manual roads layer ${index + 1}: Error!`, error);
+                    });
+                    
+                    roadsLayer.addTo(this.map);
+                    console.log(`🛣️ Manual roads layer ${index + 1} added to map`);
+                    
+                    // Store reference
+                    window[`manualRoadsLayer${index + 1}`] = roadsLayer;
+                    
+                } catch (error) {
+                    console.error(`🛣️ Error creating manual roads layer ${index + 1}:`, error);
+                }
+            });
+        };
+        
+        // Add specific function to test roads layer URL
+        window.testRoadsUrl = () => {
+            const roadsUrl = 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer/2';
+            console.log('🛣️ Testing roads layer URL...');
+            
+            fetch(`${roadsUrl}?f=json`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('🛣️ Roads layer service info:', data);
+                    if (data.error) {
+                        console.error('🛣️ Service error:', data.error);
+                    } else {
+                        console.log(`🛣️ Service is valid: ${data.name}`);
+                        console.log(`🛣️ Geometry type: ${data.geometryType}`);
+                        console.log(`🛣️ Feature count: ${data.count || 'Unknown'}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('🛣️ Failed to fetch roads service info:', error);
+                });
+        };
+        
+        // Add function to discover all service layers and find roads
+        window.discoverAllLayers = () => {
+            const serviceUrl = 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer';
+            console.log('🔍 Discovering all layers in service...');
+            
+            fetch(`${serviceUrl}?f=json`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('📊 Service metadata:', data);
+                    if (data.layers) {
+                        console.log(`📋 Found ${data.layers.length} layers:`);
+                        data.layers.forEach(layer => {
+                            console.log(`   • ID: ${layer.id}, Name: "${layer.name}", Type: ${layer.geometryType}`);
+                            
+                            // Check if this might be the roads layer
+                            if (layer.name.toLowerCase().includes('road') || 
+                                layer.name.toLowerCase().includes('centerline') ||
+                                layer.geometryType === 'esriGeometryPolyline') {
+                                console.log(`     🛣️ POTENTIAL ROADS LAYER: ${layer.name} (ID: ${layer.id})`);
+                                
+                                // Test this specific layer
+                                const layerUrl = `${serviceUrl}/${layer.id}`;
+                                fetch(`${layerUrl}?f=json`)
+                                    .then(response => response.json())
+                                    .then(layerData => {
+                                        console.log(`     🔍 Layer ${layer.id} details:`, {
+                                            name: layerData.name,
+                                            geometryType: layerData.geometryType,
+                                            hasFeatures: layerData.hasStaticData !== false,
+                                            capabilities: layerData.capabilities
+                                        });
+                                        
+                                        // Try to create this layer
+                                        if (layer.geometryType === 'esriGeometryPolyline') {
+                                            console.log(`     🛣️ Attempting to create layer ${layer.id}...`);
+                                            window.tryCreateSpecificRoadLayer(layer.id, layer.name);
+                                        }
+                                    })
+                                    .catch(err => console.error(`     ❌ Failed to get details for layer ${layer.id}:`, err));
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Failed to discover service layers:', error);
+                });
+        };
+        
+        // Add function to try creating a specific road layer by ID
+        window.tryCreateSpecificRoadLayer = (layerId, layerName) => {
+            const serviceUrl = 'https://services.arcgis.com/HRPe58bUyBqyyiCt/arcgis/rest/services/Delta_County_view/FeatureServer';
+            const layerUrl = `${serviceUrl}/${layerId}`;
+            
+            console.log(`🛣️ Attempting to create road layer: ${layerName} (ID: ${layerId})`);
+            console.log(`🛣️ URL: ${layerUrl}`);
+            
+            try {
+                const roadLayer = L.esri.featureLayer({
+                    url: layerUrl,
+                    style: {
+                        color: '#ff0000', // Use red for testing visibility
+                        weight: 4,
+                        opacity: 1
+                    }
+                });
+                
+                roadLayer.on('loading', () => {
+                    console.log(`🛣️ Layer ${layerId}: Loading...`);
+                });
+                
+                roadLayer.on('load', () => {
+                    console.log(`🛣️ Layer ${layerId}: Loaded successfully!`);
+                    
+                    // Check feature count
+                    setTimeout(() => {
+                        let featureCount = 0;
+                        if (roadLayer.getLayers) {
+                            featureCount = roadLayer.getLayers().length;
+                        }
+                        console.log(`🛣️ Layer ${layerId} has ${featureCount} features`);
+                        
+                        if (featureCount > 0) {
+                            console.log(`✅ FOUND WORKING ROADS LAYER: ${layerName} (ID: ${layerId})`);
+                        }
+                    }, 2000);
+                });
+                
+                roadLayer.on('error', (error) => {
+                    console.error(`🛣️ Layer ${layerId}: Error!`, error);
+                });
+                
+                roadLayer.addTo(this.map);
+                
+                // Store reference with layer ID
+                window[`roadLayer_${layerId}`] = roadLayer;
+                
+            } catch (error) {
+                console.error(`🛣️ Error creating layer ${layerId}:`, error);
+            }
+        };
+        
+        // Add a simple test to create a basic test line to verify line rendering works
+        window.createTestLine = () => {
+            console.log('🧪 Creating test line to verify line rendering...');
+            
+            // Create a simple test line across Delta County
+            const testLine = L.polyline([
+                [45.7, -87.0],
+                [45.8, -86.8],
+                [45.6, -86.6]
+            ], {
+                color: '#ff0000',
+                weight: 10,
+                opacity: 1
+            });
+            
+            testLine.addTo(this.map);
+            console.log('🧪 Test line added to map - if you can see a red line, line rendering works');
+            
+            window.testLine = testLine;
+            
+            // Also create a simple GeoJSON line
+            const geoJsonLine = {
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [-87.1, 45.7],
+                        [-86.9, 45.7],
+                        [-86.7, 45.9]
+                    ]
+                }
+            };
+            
+            const geoLayer = L.geoJSON(geoJsonLine, {
+                style: {
+                    color: '#00ff00',
+                    weight: 8,
+                    opacity: 1
+                }
+            });
+            
+            geoLayer.addTo(this.map);
+            console.log('🧪 GeoJSON test line added - if you can see a green line, GeoJSON rendering works');
+            
+            window.testGeoLine = geoLayer;
+        };
+        
+        // Add specific layer control debugging function
+        window.debugLayerControl = () => {
+            console.log('🎛️ LAYER CONTROL DEBUG REPORT:');
+            
+            console.log('📋 Allowed Layers Status:');
+            Object.keys(this.allowedLayers).forEach(layerType => {
+                const layer = this.allowedLayers[layerType];
+                console.log(`   ${layerType}:`);
+                console.log(`     - Has layer: ${!!layer}`);
+                console.log(`     - On map: ${layer ? this.map.hasLayer(layer) : 'N/A'}`);
+                console.log(`     - Layer type: ${layer ? layer.constructor.name : 'N/A'}`);
+            });
+            
+            console.log('🎛️ Layer Control Status:');
+            console.log(`   - Control exists: ${!!this.layerControl}`);
+            console.log(`   - Control on map: ${this.layerControl ? this.map.hasControl ? this.map.hasControl(this.layerControl) : 'Unknown' : 'N/A'}`);
+            
+            // Try to manually toggle roads layer
+            if (this.allowedLayers.roads) {
+                console.log('🛣️ Manual Roads Layer Test:');
+                const isOnMap = this.map.hasLayer(this.allowedLayers.roads);
+                console.log(`   Currently on map: ${isOnMap}`);
+                
+                if (isOnMap) {
+                    console.log('   Trying to remove...');
+                    this.map.removeLayer(this.allowedLayers.roads);
+                    console.log(`   After removal: ${this.map.hasLayer(this.allowedLayers.roads)}`);
+                    
+                    // Add it back after 2 seconds
+                    setTimeout(() => {
+                        console.log('   Adding back...');
+                        this.allowedLayers.roads.addTo(this.map);
+                        console.log(`   After adding: ${this.map.hasLayer(this.allowedLayers.roads)}`);
+                    }, 2000);
+                } else {
+                    console.log('   Trying to add...');
+                    this.allowedLayers.roads.addTo(this.map);
+                    console.log(`   After adding: ${this.map.hasLayer(this.allowedLayers.roads)}`);
+                }
+            }
+        };
+        
         // Auto-run debug after 5 seconds
         setTimeout(() => {
             window.debugRoadLayers();
+            window.debugLayerControl();
+            window.testRoadsUrl();
+            window.discoverAllLayers();
+            window.createTestLine();
         }, 5000);
 
         console.log('📋 Basic controls setup complete, township selector will be added after service initialization');
@@ -587,7 +866,23 @@ class DeltaCountyApp {
         }).addTo(this.map);
         
         // Add event listeners to update legend when layers are toggled
-        this.map.on('overlayadd overlayremove', () => {
+        this.map.on('overlayadd overlayremove', (e) => {
+            console.log(`🎛️ Layer control event: ${e.type} for layer: ${e.name}`);
+            
+            // Handle roads layer specifically
+            if (e.name === '🛣️ Road Centerlines') {
+                console.log(`🛣️ Roads layer ${e.type === 'overlayadd' ? 'added' : 'removed'}`);
+                
+                // Ensure the roads layer reference is correct
+                if (e.type === 'overlayadd' && this.allowedLayers.roads && !this.map.hasLayer(this.allowedLayers.roads)) {
+                    console.log('🔧 Forcing roads layer to be added to map');
+                    this.allowedLayers.roads.addTo(this.map);
+                } else if (e.type === 'overlayremove' && this.allowedLayers.roads && this.map.hasLayer(this.allowedLayers.roads)) {
+                    console.log('🔧 Forcing roads layer to be removed from map');
+                    this.map.removeLayer(this.allowedLayers.roads);
+                }
+            }
+            
             // Small delay to ensure the layer state has updated
             setTimeout(() => this.updateLegend(), 100);
         });
@@ -639,6 +934,21 @@ class DeltaCountyApp {
             this.layerControl.addOverlay(layer, displayName);
             console.log(`✅ Added to custom control: ${displayName}`);
             
+            // Special debugging for roads layer
+            if (layerType === 'roads') {
+                console.log(`🛣️ ROADS LAYER DEBUG:`);
+                console.log(`   Layer object:`, layer);
+                console.log(`   Layer constructor:`, layer.constructor.name);
+                console.log(`   Is on map:`, this.map.hasLayer(layer));
+                console.log(`   Stored in allowedLayers:`, !!this.allowedLayers.roads);
+                
+                // Ensure the layer is properly added to the map initially
+                if (!this.map.hasLayer(layer)) {
+                    console.log(`🔧 Adding roads layer to map as it wasn't already there`);
+                    layer.addTo(this.map);
+                }
+            }
+            
             // Update legend when new layer is added
             this.updateLegend();
         } else {
@@ -657,9 +967,8 @@ class DeltaCountyApp {
             const layerTypes = [
                 {
                     name: '🏞️ Townships',
-                    type: 'polygon',
+                    type: 'line',
                     color: '#2E86AB',
-                    fillColor: '#A23B72',
                     layer: this.allowedLayers.townships
                 },
                 {

@@ -110,7 +110,7 @@ class DeltaCountyFallbackService {
                 opacity: 1,
                 fillOpacity: 0.8
             },
-            'Roads': {
+            'Road_Centerlines_Delta_County': {
                 color: '#000000',
                 weight: 2,
                 opacity: 1

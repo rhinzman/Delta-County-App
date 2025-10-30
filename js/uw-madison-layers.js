@@ -70,7 +70,7 @@ class DeltaCountyLayerManager {
     formatLayerName(name) {
         // Clean up layer names for better display
         const nameMap = {
-            'Site_Structure_Address_Points_Delta_County': '🏠 Address Points',
+            'Road Centerlines': '🏠 Address Points',
             'parcels': '📐 Parcels',
             'Townships': '🏘️ Townships'
         };
@@ -101,7 +101,7 @@ class DeltaCountyLayerManager {
                 fillOpacity: 0.2,
                 opacity: 0.7
             },
-            'Site_Structure_Address_Points_Delta_County': {
+            'Address Points': {
                 // Simple blue dot for address points without shadow/border
                 radius: 3,
                 fillColor: '#3498db',
@@ -119,18 +119,18 @@ class DeltaCountyLayerManager {
         // Create appropriate popup templates for each layer
         const templates = {
             'Townships': {
-                title: '🏘️ {NAME}',
+                title: '🏘️ {Label}',
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #2E86AB;">Township Information</h4>
-                        <p><strong>Name:</strong> {NAME}</p>
+                        <p><strong>Name:</strong> {Label}</p>
                         <p><strong>Type:</strong> {TYPE}</p>
                         <p><strong>County:</strong> Delta County, Michigan</p>
                     </div>
                 `
             },
             'parcels': {
-                title: '📐 Parcel {PARCEL_ID}',
+                title: '📐 Parcel {PARCEL_PIN}',
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #F18F01;">Property Information</h4>
