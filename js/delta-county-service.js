@@ -26,6 +26,19 @@ class DeltaCountyServiceManager {
                 throw new Error(`Service Error: ${serviceData.error.message}`);
             }
             
+            // Check coordinate system
+            if (serviceData.spatialReference) {
+                const wkid = serviceData.spatialReference.wkid || serviceData.spatialReference.latestWkid;
+                console.log(`🧭 Service coordinate system: WKID ${wkid}`);
+                
+                if (wkid !== 3857 && wkid !== 102100) {
+                    console.warn(`⚠️ Service uses coordinate system WKID ${wkid}, not Web Mercator (3857)`);
+                    console.warn('This may cause coordinate transformation issues with Leaflet');
+                } else {
+                    console.log('✅ Service uses Web Mercator coordinate system - good for Leaflet');
+                }
+            }
+            
             if (serviceData.layers && serviceData.layers.length > 0) {
                 console.log(`✅ Successfully connected to Delta County service`);
                 console.log(`📊 Found ${serviceData.layers.length} layers:`);
@@ -109,12 +122,6 @@ class DeltaCountyServiceManager {
         const isVisible = defaultVisible.includes(layerInfo.name);
         console.log(`👁️ Layer ${layerInfo.name} visible by default: ${isVisible}`);
         
-        // FORCE roads to be visible for debugging
-        if (layerInfo.name === 'Road_Centerlines_Delta_County') {
-            console.log(`🛣️ FORCING Road_Centerlines_Delta_County to be visible!`);
-            return true;
-        }
-        
         return isVisible;
     }
 
@@ -124,17 +131,18 @@ class DeltaCountyServiceManager {
             'Townships': {
                 color: '#2E86AB',
                 weight: 2,
-                fillColor: 'transparent',
-                fillOpacity: 0,
+                fillColor: '#3498db',
+                fillOpacity: 0.5,
                 opacity: 0.8,
-                fill: false
+                fill: true
             },
             'parcels': {
                 color: '#F18F01',
                 weight: 1,
-                fillColor: 'transparent',
-                fillOpacity: 0,
-                opacity: 0.7
+                fillColor: '#C73E1D',
+                fillOpacity: 0.3,
+                opacity: 0.7,
+                fill: true
             },
             'Site_Structure_Address_Points_Delta_County': {
                 // Simple blue dot for address points without shadow/border
@@ -156,39 +164,39 @@ class DeltaCountyServiceManager {
         return styles[layerInfo.name] || this.getDefaultStyle(layerInfo.geometryType);
     }
 
-    getDefaultStyle(geometryType) {
-        switch (geometryType) {
-            case 'esriGeometryPoint':
-                return {
-                    radius: 6,
-                    fillColor: '#ff7800',
-                    color: '#000',
-                    weight: 1,
-                    opacity: 1,
-                    fillOpacity: 0.8
-                };
-            case 'esriGeometryPolyline':
-                return {
-                    color: '#000000',
-                    weight: 2,
-                    opacity: 1
-                };
-            case 'esriGeometryPolygon':
-                return {
-                    fillColor: '#fe57a1',
-                    weight: 2,
-                    opacity: 1,
-                    color: 'white',
-                    fillOpacity: 0.3
-                };
-            default:
-                return {
-                    color: '#3388ff',
-                    weight: 2,
-                    opacity: 0.8
-                };
-        }
-    }
+    // getDefaultStyle(geometryType) {
+    //     switch (geometryType) {
+    //         case 'esriGeometryPoint':
+    //             return {
+    //                 radius: 6,
+    //                 fillColor: '#ff7800',
+    //                 color: '#000',
+    //                 weight: 1,
+    //                 opacity: 1,
+    //                 fillOpacity: 0.8
+    //             };
+    //         case 'esriGeometryPolyline':
+    //             return {
+    //                 color: '#000000',
+    //                 weight: 2,
+    //                 opacity: 1
+    //             };
+    //         case 'esriGeometryPolygon':
+    //             return {
+    //                 fillColor: '#fe57a1',
+    //                 weight: 2,
+    //                 opacity: 1,
+    //                 color: 'white',
+    //                 fillOpacity: 0.3
+    //             };
+    //         default:
+    //             return {
+    //                 color: '#3388ff',
+    //                 weight: 2,
+    //                 opacity: 0.8
+    //             };
+    //     }
+    // }
 
     createPopupTemplate(layerInfo) {
         // Create appropriate popup templates for each layer
@@ -209,11 +217,9 @@ class DeltaCountyServiceManager {
                 content: `
                     <div style="padding: 10px; font-family: Arial, sans-serif;">
                         <h4 style="margin-top: 0; color: #F18F01;">Property Information</h4>
-                        <p><strong>Parcel ID:</strong> {PARCEL_ID}</p>
-                        <p><strong>Owner:</strong> {OWNER_NAME}</p>
-                        <p><strong>Address:</strong> {SITE_ADDR}</p>
-                        <p><strong>Township:</strong> {TOWNSHIP}</p>
-                        <p><strong>Acreage:</strong> {ACRES}</p>
+                        <p><strong>Parcel ID:</strong> {PARCEL_PIN}</p>
+                        <p><strong>Owner:</strong> {Owner_s_Name}</p>
+                        <p><strong>Address:</strong> {Property_Address}</p>
                     </div>
                 `
             },
@@ -324,6 +330,15 @@ class DeltaCountyServiceManager {
                     url: layerConfig.url,
                     style: layerConfig.style,
                     pointToLayer: (feature, latlng) => {
+                        // Validate coordinates before creating markers
+                        if (!latlng || typeof latlng.lat !== 'number' || typeof latlng.lng !== 'number' ||
+                            isNaN(latlng.lat) || isNaN(latlng.lng) ||
+                            latlng.lat < -90 || latlng.lat > 90 ||
+                            latlng.lng < -180 || latlng.lng > 180) {
+                            console.warn(`⚠️ Invalid coordinates for feature in ${layerConfig.name}:`, latlng, feature);
+                            return null; // Skip this feature
+                        }
+                        
                         // Create simple blue dots for address points
                         if (layerConfig.name.includes('Address Points') && layerConfig.style && layerConfig.style.radius) {
                             return L.circleMarker(latlng, layerConfig.style);
@@ -364,6 +379,16 @@ class DeltaCountyServiceManager {
                     }
                 });
 
+                // Add request error handling for coordinate issues
+                layer.on('requesterror', function(e) {
+                    console.error(`❌ Request error for ${layerConfig.name}:`, e);
+                    if (e && e.message && e.message.includes('Invalid LatLng')) {
+                        console.error(`🧭 COORDINATE ERROR: Invalid LatLng object detected in ${layerConfig.name}`);
+                        console.error('This usually means the service is returning features with invalid coordinates');
+                        console.error('Check if the service coordinate system is compatible with Leaflet (Web Mercator)');
+                    }
+                });
+
                 layer.on('load', function() {
                     console.log(`✅ Successfully loaded layer: ${layerConfig.name}`);
                     if (layerConfig.name.includes('Road Centerlines')) {
@@ -394,8 +419,9 @@ class DeltaCountyServiceManager {
                 // Store layer reference
                 layerConfig.leafletLayer = layer;
 
-                // Add to map if visible
-                if (layerConfig.visible) {
+                // Add to map if visible AND not a layer that will be wrapped in LayerGroup
+                // (Roads will be handled by the layer control after wrapping)
+                if (layerConfig.visible && !layerConfig.name.includes('Road Centerlines')) {
                     console.log(`🗺️ Adding visible layer to map: ${layerConfig.name}`);
                     layer.addTo(this.map);
                     console.log(`✅ Layer added to map: ${layerConfig.name}`);
@@ -408,6 +434,8 @@ class DeltaCountyServiceManager {
                             console.error(`✗ Layer not found on map: ${layerConfig.name}`);
                         }
                     }, 2000);
+                } else if (layerConfig.name.includes('Road Centerlines')) {
+                    console.log(`📋 Roads layer configured but will be wrapped in LayerGroup: ${layerConfig.name}`);
                 } else {
                     console.log(`📋 Layer configured but not visible: ${layerConfig.name}`);
                 }

@@ -70,9 +70,10 @@ class DeltaCountyLayerManager {
     formatLayerName(name) {
         // Clean up layer names for better display
         const nameMap = {
-            'Road Centerlines': '🏠 Address Points',
+            'Address Points': '🏠 Address Points',
             'parcels': '📐 Parcels',
-            'Townships': '🏘️ Townships'
+            'Townships': '🏘️ Townships',
+            'Road_Centerlines': '🛣️ Road Centerlines',
         };
         
         return nameMap[name] || `📍 ${name.replace(/_/g, ' ')}`;
@@ -80,7 +81,7 @@ class DeltaCountyLayerManager {
 
     shouldBeVisibleByDefault(layerInfo) {
         // Show some layers by default
-        const defaultVisible = ['Townships', 'parcels'];
+        const defaultVisible = ['Townships', 'parcels', 'Road_Centerlines'];
         return defaultVisible.includes(layerInfo.name);
     }
 
@@ -115,174 +116,7 @@ class DeltaCountyLayerManager {
         return styles[layerInfo.name] || this.getDefaultStyle(layerInfo.geometryType);
     }
 
-    createPopupTemplate(layerInfo) {
-        // Create appropriate popup templates for each layer
-        const templates = {
-            'Townships': {
-                title: '🏘️ {Label}',
-                content: `
-                    <div style="padding: 10px; font-family: Arial, sans-serif;">
-                        <h4 style="margin-top: 0; color: #2E86AB;">Township Information</h4>
-                        <p><strong>Name:</strong> {Label}</p>
-                        <p><strong>Type:</strong> {TYPE}</p>
-                        <p><strong>County:</strong> Delta County, Michigan</p>
-                    </div>
-                `
-            },
-            'parcels': {
-                title: '📐 Parcel {PARCEL_PIN}',
-                content: `
-                    <div style="padding: 10px; font-family: Arial, sans-serif;">
-                        <h4 style="margin-top: 0; color: #F18F01;">Property Information</h4>
-                        <p><strong>Parcel ID:</strong> {PARCEL_ID}</p>
-                        <p><strong>Owner:</strong> {OWNER_NAME}</p>
-                        <p><strong>Address:</strong> {SITE_ADDR}</p>
-                        <p><strong>Township:</strong> {TOWNSHIP}</p>
-                        <p><strong>Acreage:</strong> {ACRES}</p>
-                    </div>
-                `
-            },
-            'Site_Structure_Address_Points_Delta_County': {
-                title: '🏠 {FULL_ADDRESS}',
-                content: `
-                    <div style="padding: 10px; font-family: Arial, sans-serif;">
-                        <h4 style="margin-top: 0; color: #3F612D;">Address Information</h4>
-                        <p><strong>Address:</strong> {FULL_ADDRESS}</p>
-                        <p><strong>City:</strong> {CITY}</p>
-                        <p><strong>State:</strong> {STATE}</p>
-                        <p><strong>ZIP:</strong> {ZIP}</p>
-                    </div>
-                `
-            }
-        };
-        
-        return templates[layerInfo.name] || {
-            title: layerInfo.name,
-            content: 'Click for feature details...'
-        };
-    }
-
-    async testServicePatternsForItem(itemId) {
-        // Extended UW-Madison ArcGIS service URL patterns for each item
-        const possibleUrls = [
-            // Standard ArcGIS Online patterns with different org IDs
-            `https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://services.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://services.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/${itemId}/FeatureServer`,
-            
-            // Try different organization IDs that might be associated with UW-Madison
-            `https://services1.arcgis.com/bDAhvQYMwHYFLNLX/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://services.arcgis.com/bDAhvQYMwHYFLNLX/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://services1.arcgis.com/bDAhvQYMwHYFLNLX/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://services.arcgis.com/bDAhvQYMwHYFLNLX/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            
-            // Try alternative organization patterns
-            `https://services1.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://services.arcgis.com/P3ePLMYs2RVChkJx/arcgis/rest/services/${itemId}/FeatureServer`,
-            
-            // UW-Madison specific patterns
-            `https://gis.wisc.edu/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://gis.wisc.edu/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://uwmadison.maps.arcgis.com/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://uwmadison.maps.arcgis.com/arcgis/rest/services/${itemId}/FeatureServer`,
-            
-            // Alternative UW patterns
-            `https://maps.wisc.edu/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://maps.wisc.edu/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://geodata.wisc.edu/arcgis/rest/services/service_${itemId}/FeatureServer`,
-            `https://geodata.wisc.edu/arcgis/rest/services/${itemId}/FeatureServer`,
-            
-            // Try as hosted feature layer with different patterns
-            `https://services1.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Hosted_${itemId}/FeatureServer`,
-            `https://services.arcgis.com/Hp6G80Pky0om7QvQ/arcgis/rest/services/Hosted_${itemId}/FeatureServer`,
-            
-            // Try public/world services pattern
-            `https://services.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/${itemId}/FeatureServer`,
-            `https://services1.arcgis.com/fLeGjb7u4uXqeF9q/arcgis/rest/services/${itemId}/FeatureServer`
-        ];
-
-        console.log('Attempting to discover UW-Madison service URLs...');
-
-        for (const url of possibleUrls) {
-            try {
-                console.log(`Testing service URL: ${url}`);
-                const response = await fetch(`${url}?f=json`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    
-                    // Check for authentication errors
-                    if (data.error) {
-                        if (data.error.code === 403 || data.error.message.includes('permissions')) {
-                            console.warn(`Service requires authentication: ${url}`);
-                            console.warn(`Error: ${data.error.message}`);
-                            continue;
-                        } else if (data.error.code === 400) {
-                            console.log(`Invalid service URL: ${url}`);
-                            continue;
-                        }
-                    }
-                    
-                    // Check if this is a valid feature service
-                    if (data.layers && data.layers.length > 0) {
-                        console.log(`✓ Found valid service at: ${url}`);
-                        console.log(`  Service name: ${data.serviceDescription || 'No description'}`);
-                        console.log(`  Number of layers: ${data.layers.length}`);
-                        console.log(`  Item ID: ${itemId}`);
-                        this.serviceUrls.push(url);
-                        await this.processService(url, data, itemId);
-                    } else if (data.serviceDescription) {
-                        console.log(`Found service but no layers: ${url}`);
-                    }
-                } else {
-                    console.log(`HTTP ${response.status}: ${url}`);
-                }
-            } catch (error) {
-                console.log(`Network error for ${url}: ${error.message}`);
-            }
-        }
-
-        if (this.serviceUrls.length === 0) {
-            console.warn('No UW-Madison services found with standard URL patterns');
-            this.tryFallbackApproach();
-        }
-    }
-
-    async processService(serviceUrl, serviceData, itemId) {
-        console.log(`Processing service: ${serviceUrl}`);
-        console.log('Available layers:', serviceData.layers);
-        console.log(`Source Item ID: ${itemId}`);
-
-        // Create layer configurations for each layer in the service
-        serviceData.layers.forEach(layerInfo => {
-            const layerConfig = {
-                id: `uwmadison_${itemId}_${layerInfo.id}`,
-                name: `UW-Madison: ${layerInfo.name} (${itemId.substring(0,8)}...)`,
-                url: `${serviceUrl}/${layerInfo.id}`,
-                type: 'featureLayer',
-                visible: false, // Start hidden, user can enable
-                style: this.getDefaultStyle(layerInfo.geometryType),
-                popupTemplate: {
-                    title: `{${this.guessDisplayField(layerInfo)}}`,
-                    content: `
-                        <div style="padding: 10px;">
-                            <h4>🏛️ UW-Madison Data</h4>
-                            <p><strong>Layer:</strong> ${layerInfo.name}</p>
-                            <p><strong>Source:</strong> ${itemId}</p>
-                            <p><strong>Geometry:</strong> ${layerInfo.geometryType || 'Unknown'}</p>
-                            <hr>
-                            <p>Click for feature details...</p>
-                        </div>
-                    `
-                },
-                layerInfo: layerInfo,
-                sourceItemId: itemId
-            };
-
-            this.layers.push(layerConfig);
-        });
-    }
+    
 
     getDefaultStyle(geometryType) {
         switch (geometryType) {
@@ -321,7 +155,7 @@ class DeltaCountyLayerManager {
 
     guessDisplayField(layerInfo) {
         // Try to guess the best field for display
-        const commonNameFields = ['NAME', 'TITLE', 'LABEL', 'ID', 'OBJECTID'];
+        const commonNameFields = ['Name', 'Label', 'Parcel_PIN', 'ID', 'OBJECTID'];
         
         if (layerInfo.displayField) {
             return layerInfo.displayField;
@@ -489,5 +323,5 @@ class DeltaCountyLayerManager {
 
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = UWMadisonLayerManager;
+    module.exports = DeltaCountyLayerManager;
 }

@@ -30,15 +30,29 @@ class DeltaCountyApp {
     }
     
     createMap() {
-        // Initialize the map
-        this.map = L.map('map', {
-            center: DeltaCountyConfig.map.center,
-            zoom: DeltaCountyConfig.map.zoom,
-            minZoom: DeltaCountyConfig.map.minZoom,
-            maxZoom: DeltaCountyConfig.map.maxZoom,
-            zoomControl: false
-        });
-        
+        // Initialize the map with error handling for coordinates
+        try {
+            console.log('🗺️ Initializing map with coordinates:', DeltaCountyConfig.map.center);
+            
+            // Validate coordinates before creating map
+            const [lat, lng] = DeltaCountyConfig.map.center;
+            if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                throw new Error(`Invalid coordinates: [${lat}, ${lng}]`);
+            }
+            
+            this.map = L.map('map', {
+                center: DeltaCountyConfig.map.center,
+                zoom: DeltaCountyConfig.map.zoom,
+                minZoom: DeltaCountyConfig.map.minZoom,
+                maxZoom: DeltaCountyConfig.map.maxZoom,
+                zoomControl: false
+            });
+            
+            console.log('✅ Map initialized successfully');
+
+        } catch (error) {
+            console.error('❌ Error initializing map:', error);
+        }
         // Add zoom control to top-left
         L.control.zoom({ position: 'topleft' }).addTo(this.map);
         
@@ -684,12 +698,6 @@ class DeltaCountyApp {
                                             hasFeatures: layerData.hasStaticData !== false,
                                             capabilities: layerData.capabilities
                                         });
-                                        
-                                        // Try to create this layer
-                                        if (layer.geometryType === 'esriGeometryPolyline') {
-                                            console.log(`     🛣️ Attempting to create layer ${layer.id}...`);
-                                            window.tryCreateSpecificRoadLayer(layer.id, layer.name);
-                                        }
                                     })
                                     .catch(err => console.error(`     ❌ Failed to get details for layer ${layer.id}:`, err));
                             }
@@ -758,47 +766,356 @@ class DeltaCountyApp {
         window.createTestLine = () => {
             console.log('🧪 Creating test line to verify line rendering...');
             
-            // Create a simple test line across Delta County
-            const testLine = L.polyline([
-                [45.7, -87.0],
-                [45.8, -86.8],
-                [45.6, -86.6]
-            ], {
-                color: '#ff0000',
-                weight: 10,
-                opacity: 1
-            });
-            
-            testLine.addTo(this.map);
-            console.log('🧪 Test line added to map - if you can see a red line, line rendering works');
-            
-            window.testLine = testLine;
-            
-            // Also create a simple GeoJSON line
-            const geoJsonLine = {
-                "type": "Feature",
-                "geometry": {
-                    "type": "LineString",
-                    "coordinates": [
-                        [-87.1, 45.7],
-                        [-86.9, 45.7],
-                        [-86.7, 45.9]
-                    ]
-                }
-            };
-            
-            const geoLayer = L.geoJSON(geoJsonLine, {
-                style: {
-                    color: '#00ff00',
-                    weight: 8,
+            try {
+                // Create a simple test line across Delta County with validated coordinates
+                const testCoords = [
+                    [45.7, -87.0],
+                    [45.8, -86.8],
+                    [45.6, -86.6]
+                ];
+                
+                // Validate coordinates
+                testCoords.forEach((coord, index) => {
+                    const [lat, lng] = coord;
+                    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                        throw new Error(`Invalid test coordinate ${index}: [${lat}, ${lng}]`);
+                    }
+                });
+                
+                const testLine = L.polyline(testCoords, {
+                    color: '#ff0000',
+                    weight: 10,
                     opacity: 1
+                });
+                
+                testLine.addTo(this.map);
+                console.log('🧪 Test line added to map - if you can see a red line, line rendering works');
+                
+                window.testLine = testLine;
+                
+            } catch (error) {
+                console.error('❌ Error creating test line:', error);
+            }
+            
+            try {
+                // Also create a simple GeoJSON line with validated coordinates
+                const geoJsonLine = {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [-87.1, 45.7],
+                            [-86.9, 45.7],
+                            [-86.7, 45.9]
+                        ]
+                    }
+                };
+                
+                // Validate GeoJSON coordinates
+                geoJsonLine.geometry.coordinates.forEach((coord, index) => {
+                    const [lng, lat] = coord; // GeoJSON is [lng, lat]
+                    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                        throw new Error(`Invalid GeoJSON coordinate ${index}: [${lng}, ${lat}]`);
+                    }
+                });
+                
+                const geoLayer = L.geoJSON(geoJsonLine, {
+                    style: {
+                        color: '#00ff00',
+                        weight: 8,
+                        opacity: 1
+                    }
+                });
+                
+                geoLayer.addTo(this.map);
+                console.log('🧪 GeoJSON test line added - if you can see a green line, GeoJSON rendering works');
+                
+                window.testGeoLine = geoLayer;
+                
+            } catch (error) {
+                console.error('❌ Error creating GeoJSON test line:', error);
+            }
+        };
+        
+        // Add function to debug roads layer features
+        window.debugRoadsLayerFeatures = (layer) => {
+            console.log('🛣️ DEBUGGING ROADS LAYER FEATURES:');
+            console.log(`   Layer object:`, layer);
+            console.log(`   Layer type: ${layer.constructor.name}`);
+            console.log(`   On map: ${this.map.hasLayer(layer)}`);
+            
+            // Try different methods to check for features
+            try {
+                if (layer.getLayers) {
+                    const features = layer.getLayers();
+                    console.log(`   getLayers() count: ${features.length}`);
+                    if (features.length > 0) {
+                        console.log(`   First feature:`, features[0]);
+                    }
+                } else {
+                    console.log(`   No getLayers() method available`);
+                }
+                
+                if (layer.eachLayer) {
+                    let count = 0;
+                    layer.eachLayer(() => count++);
+                    console.log(`   eachLayer() count: ${count}`);
+                } else {
+                    console.log(`   No eachLayer() method available`);
+                }
+                
+                // Check if it's an Esri feature layer
+                if (layer.query) {
+                    console.log(`   Has query method - trying to count features...`);
+                    layer.query()
+                        .where('1=1')
+                        .count((error, count) => {
+                            if (error) {
+                                console.error(`   Query count error:`, error);
+                            } else {
+                                console.log(`   Query count result: ${count} features`);
+                            }
+                        });
+                } else {
+                    console.log(`   No query() method available`);
+                }
+                
+                // Check layer bounds
+                if (layer.getBounds) {
+                    const bounds = layer.getBounds();
+                    console.log(`   Layer bounds:`, bounds);
+                    if (bounds.isValid && bounds.isValid()) {
+                        console.log(`   Bounds are valid`);
+                    } else {
+                        console.log(`   Bounds are not valid or empty`);
+                    }
+                } else {
+                    console.log(`   No getBounds() method available`);
+                }
+                
+            } catch (error) {
+                console.error('🛣️ Error debugging roads layer features:', error);
+            }
+        };
+        
+        // Add function to diagnose and fix roads layer visibility
+        window.fixRoadsLayerVisibility = () => {
+            console.log('🔧 ATTEMPTING TO FIX ROADS LAYER VISIBILITY:');
+            
+            if (!this.allowedLayers.roads) {
+                console.error('❌ No roads layer found in allowedLayers');
+                return;
+            }
+            
+            const roadsLayer = this.allowedLayers.roads;
+            console.log(`🔍 Roads layer object:`, roadsLayer);
+            console.log(`🔍 On map: ${this.map.hasLayer(roadsLayer)}`);
+            
+            // Try to make it more visible with enhanced styling
+            try {
+                if (roadsLayer.setStyle) {
+                    console.log('🎨 Applying enhanced styling...');
+                    roadsLayer.setStyle({
+                        color: '#100e0eff',  // Bright red
+                        weight: 5,         // Thick line
+                        opacity: 1,        // Fully opaque
+                        dashArray: null    // Solid line
+                    });
+                } else if (roadsLayer.eachLayer) {
+                    console.log('🎨 Applying styling to each feature...');
+                    roadsLayer.eachLayer(layer => {
+                        if (layer.setStyle) {
+                            layer.setStyle({
+                                color: '#ff0000',
+                                weight: 5,
+                                opacity: 1
+                            });
+                        }
+                    });
+                }
+                
+                // Force re-add to map
+                if (this.map.hasLayer(roadsLayer)) {
+                    console.log('🔄 Removing and re-adding to map...');
+                    this.map.removeLayer(roadsLayer);
+                }
+                
+                setTimeout(() => {
+                    roadsLayer.addTo(this.map);
+                    console.log('✅ Roads layer re-added to map');
+                    
+                    // Bring to front
+                    if (roadsLayer.bringToFront) {
+                        roadsLayer.bringToFront();
+                        console.log('⬆️ Brought roads layer to front');
+                    }
+                }, 500);
+                
+            } catch (error) {
+                console.error('❌ Error fixing roads layer visibility:', error);
+            }
+        };
+        
+        // Add function to check for coordinate loading issues
+        window.checkCoordinateIssues = () => {
+            console.log('🧭 CHECKING FOR COORDINATE LOADING ISSUES:');
+            
+            // Check map center
+            const center = this.map.getCenter();
+            console.log(`📍 Map center: [${center.lat}, ${center.lng}]`);
+            
+            if (isNaN(center.lat) || isNaN(center.lng)) {
+                console.error('❌ Map center has invalid coordinates!');
+            } else {
+                console.log('✅ Map center coordinates are valid');
+            }
+            
+            // Check map bounds
+            const bounds = this.map.getBounds();
+            console.log(`📐 Map bounds:`, bounds);
+            
+            if (!bounds.isValid()) {
+                console.error('❌ Map bounds are invalid!');
+            } else {
+                console.log('✅ Map bounds are valid');
+            }
+            
+            // Check all layers for coordinate issues
+            let layerCount = 0;
+            this.map.eachLayer(layer => {
+                layerCount++;
+                try {
+                    if (layer.getBounds) {
+                        const layerBounds = layer.getBounds();
+                        if (!layerBounds.isValid()) {
+                            console.warn(`⚠️ Layer ${layerCount} (${layer.constructor.name}) has invalid bounds`);
+                        }
+                    }
+                    
+                    if (layer.getLatLng) {
+                        const latLng = layer.getLatLng();
+                        if (isNaN(latLng.lat) || isNaN(latLng.lng)) {
+                            console.warn(`⚠️ Layer ${layerCount} (${layer.constructor.name}) has invalid LatLng: [${latLng.lat}, ${latLng.lng}]`);
+                        }
+                    }
+                    
+                    if (layer.getLatLngs) {
+                        const latLngs = layer.getLatLngs();
+                        if (Array.isArray(latLngs)) {
+                            latLngs.forEach((coord, index) => {
+                                if (coord.lat !== undefined && coord.lng !== undefined) {
+                                    if (isNaN(coord.lat) || isNaN(coord.lng)) {
+                                        console.warn(`⚠️ Layer ${layerCount} coordinate ${index} is invalid: [${coord.lat}, ${coord.lng}]`);
+                                    }
+                                }
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`⚠️ Error checking layer ${layerCount}:`, error);
                 }
             });
             
-            geoLayer.addTo(this.map);
-            console.log('🧪 GeoJSON test line added - if you can see a green line, GeoJSON rendering works');
+            console.log(`🔍 Checked ${layerCount} layers for coordinate issues`);
+        };
+        
+        // Add function to check Esri layer features for coordinate issues
+        window.checkEsriLayerCoordinates = () => {
+            console.log('🔍 CHECKING ESRI LAYER FEATURES FOR COORDINATE ISSUES:');
             
-            window.testGeoLine = geoLayer;
+            // Check Delta County service layers
+            if (this.deltaCountyServiceManager && this.deltaCountyServiceManager.layers) {
+                console.log('📋 Checking Delta County layers:');
+                this.deltaCountyServiceManager.layers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer && typeof layerConfig.leafletLayer.eachLayer === 'function') {
+                        let featureCount = 0;
+                        let invalidCount = 0;
+                        
+                        layerConfig.leafletLayer.eachLayer(featureLayer => {
+                            featureCount++;
+                            
+                            // Check point features
+                            if (featureLayer.getLatLng) {
+                                const latLng = featureLayer.getLatLng();
+                                if (!latLng || isNaN(latLng.lat) || isNaN(latLng.lng) ||
+                                    latLng.lat < -90 || latLng.lat > 90 ||
+                                    latLng.lng < -180 || latLng.lng > 180) {
+                                    invalidCount++;
+                                    console.warn(`⚠️ Invalid point coordinates in ${layerConfig.name}:`, latLng);
+                                }
+                            }
+                            
+                            // Check line/polygon features
+                            if (featureLayer.getLatLngs) {
+                                const latLngs = featureLayer.getLatLngs();
+                                if (Array.isArray(latLngs)) {
+                                    latLngs.forEach((ring, ringIndex) => {
+                                        if (Array.isArray(ring)) {
+                                            ring.forEach((coord, coordIndex) => {
+                                                if (coord && (isNaN(coord.lat) || isNaN(coord.lng) ||
+                                                    coord.lat < -90 || coord.lat > 90 ||
+                                                    coord.lng < -180 || coord.lng > 180)) {
+                                                    invalidCount++;
+                                                    console.warn(`⚠️ Invalid coordinates in ${layerConfig.name} ring ${ringIndex}, coord ${coordIndex}:`, coord);
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                        
+                        console.log(`   ${layerConfig.name}: ${featureCount} features, ${invalidCount} with invalid coordinates`);
+                    }
+                });
+            }
+            
+            // Check UW-Madison service layers
+            if (this.uwMadisonServiceManager && this.uwMadisonServiceManager.layers) {
+                console.log('📋 Checking UW-Madison layers:');
+                this.uwMadisonServiceManager.layers.forEach(layerConfig => {
+                    if (layerConfig.leafletLayer && typeof layerConfig.leafletLayer.eachLayer === 'function') {
+                        let featureCount = 0;
+                        let invalidCount = 0;
+                        
+                        layerConfig.leafletLayer.eachLayer(featureLayer => {
+                            featureCount++;
+                            
+                            if (featureLayer.getLatLng) {
+                                const latLng = featureLayer.getLatLng();
+                                if (!latLng || isNaN(latLng.lat) || isNaN(latLng.lng) ||
+                                    latLng.lat < -90 || latLng.lat > 90 ||
+                                    latLng.lng < -180 || latLng.lng > 180) {
+                                    invalidCount++;
+                                    console.warn(`⚠️ Invalid point coordinates in ${layerConfig.name}:`, latLng);
+                                }
+                            }
+                            
+                            if (featureLayer.getLatLngs) {
+                                const latLngs = featureLayer.getLatLngs();
+                                if (Array.isArray(latLngs)) {
+                                    latLngs.forEach((ring, ringIndex) => {
+                                        if (Array.isArray(ring)) {
+                                            ring.forEach((coord, coordIndex) => {
+                                                if (coord && (isNaN(coord.lat) || isNaN(coord.lng) ||
+                                                    coord.lat < -90 || coord.lat > 90 ||
+                                                    coord.lng < -180 || coord.lng > 180)) {
+                                                    invalidCount++;
+                                                    console.warn(`⚠️ Invalid coordinates in ${layerConfig.name} ring ${ringIndex}, coord ${coordIndex}:`, coord);
+                                                }
+                                            });
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                        
+                        console.log(`   ${layerConfig.name}: ${featureCount} features, ${invalidCount} with invalid coordinates`);
+                    }
+                });
+            }
+            
+            console.log('✅ Esri layer coordinate check complete');
         };
         
         // Add specific layer control debugging function
@@ -850,6 +1167,7 @@ class DeltaCountyApp {
             window.testRoadsUrl();
             window.discoverAllLayers();
             window.createTestLine();
+            window.checkCoordinateIssues();
         }, 5000);
 
         console.log('📋 Basic controls setup complete, township selector will be added after service initialization');
@@ -868,19 +1186,25 @@ class DeltaCountyApp {
         // Add event listeners to update legend when layers are toggled
         this.map.on('overlayadd overlayremove', (e) => {
             console.log(`🎛️ Layer control event: ${e.type} for layer: ${e.name}`);
+            console.log(`🎛️ Event layer object:`, e.layer);
+            console.log(`🎛️ Layer constructor: ${e.layer.constructor.name}`);
+            console.log(`🎛️ Layer is on map: ${this.map.hasLayer(e.layer)}`);
             
             // Handle roads layer specifically
             if (e.name === '🛣️ Road Centerlines') {
                 console.log(`🛣️ Roads layer ${e.type === 'overlayadd' ? 'added' : 'removed'}`);
-                
-                // Ensure the roads layer reference is correct
-                if (e.type === 'overlayadd' && this.allowedLayers.roads && !this.map.hasLayer(this.allowedLayers.roads)) {
-                    console.log('🔧 Forcing roads layer to be added to map');
-                    this.allowedLayers.roads.addTo(this.map);
-                } else if (e.type === 'overlayremove' && this.allowedLayers.roads && this.map.hasLayer(this.allowedLayers.roads)) {
-                    console.log('🔧 Forcing roads layer to be removed from map');
-                    this.map.removeLayer(this.allowedLayers.roads);
-                }
+                console.log(`🛣️ Stored roads layer:`, this.allowedLayers.roads);
+                console.log(`🛣️ Event layer same as stored: ${e.layer === this.allowedLayers.roads}`);
+
+                // The layer control automatically handles add/remove, just verify
+                setTimeout(() => {
+                    const isOnMap = this.map.hasLayer(e.layer);
+                    console.log(`�️ Roads layer ${isOnMap ? 'confirmed on' : 'confirmed off'} map after ${e.type}`);
+
+                    if (isOnMap) {
+                        this.debugRoadsLayerFeatures(e.layer);
+                    }
+                }, 500);
             }
             
             // Small delay to ensure the layer state has updated
@@ -894,7 +1218,7 @@ class DeltaCountyApp {
         this.allowedLayers = {
             'townships': null,
             'parcels': null,
-            'roads': null,
+            'Road_Centerlines_Delta_County': null,
             'address_points': null
         };
     }
@@ -907,7 +1231,7 @@ class DeltaCountyApp {
         
         if (normalizedName.includes('township')) return 'townships';
         if (normalizedName.includes('parcel')) return 'parcels';
-        if (normalizedName.includes('road') || normalizedName.includes('centerline')) return 'roads';
+        if (normalizedName.includes('Road_Centerlines_Delta_County') || normalizedName.includes('Road_Centerline')) return 'Road_Centerlines_Delta_County';
         if (normalizedName.includes('address')) return 'address_points';
         
         console.log(`❌ Layer "${layerName}" not recognized as allowed layer`);
@@ -919,36 +1243,60 @@ class DeltaCountyApp {
         
         // Only add if we don't already have this layer type
         if (!this.allowedLayers[layerType]) {
-            this.allowedLayers[layerType] = layer;
+            let overlayLayer = layer;
+
+            // For roads, use the original Esri layer directly instead of the LayerGroup wrapper
+            // This ensures proper Esri layer management
+            if (layerType === 'Road_Centerlines_Delta_County' || layerType === 'roads') {
+                try {
+                    // Keep original reference for direct control
+                    this.originalLayers = this.originalLayers || {};
+                    this.originalLayers.roads = layer;
+                    
+                    // Use the Esri layer directly (don't wrap in LayerGroup)
+                    overlayLayer = layer;
+                    
+                    console.log('🛣️ Using Esri layer directly for roads (no LayerGroup wrapping)');
+                } catch (wrapErr) {
+                    console.warn('⚠️ Could not setup roads layer, continuing with original layer:', wrapErr);
+                    overlayLayer = layer;
+                }
+            }
+
+            this.allowedLayers[layerType] = overlayLayer;
             
             // Create display name with emoji
             let displayName;
             switch(layerType) {
                 case 'townships': displayName = '🏞️ Townships'; break;
                 case 'parcels': displayName = '📄 Parcels'; break;
-                case 'roads': displayName = '🛣️ Road Centerlines'; break;
+                case 'Road_Centerlines_Delta_County': displayName = '🛣️ Road Centerlines'; break;
                 case 'address_points': displayName = '🏠 Address Points'; break;
                 default: displayName = layerName;
             }
-            
-            this.layerControl.addOverlay(layer, displayName);
+
+            this.layerControl.addOverlay(overlayLayer, displayName);
             console.log(`✅ Added to custom control: ${displayName}`);
-            
+
             // Special debugging for roads layer
-            if (layerType === 'roads') {
+            if (layerType === 'Road_Centerlines_Delta_County') {
                 console.log(`🛣️ ROADS LAYER DEBUG:`);
-                console.log(`   Layer object:`, layer);
-                console.log(`   Layer constructor:`, layer.constructor.name);
-                console.log(`   Is on map:`, this.map.hasLayer(layer));
-                console.log(`   Stored in allowedLayers:`, !!this.allowedLayers.roads);
+                console.log(`   Original layer object:`, layer);
+                console.log(`   Overlay (stored) object:`, overlayLayer);
+                console.log(`   Overlay constructor:`, overlayLayer.constructor.name);
+                console.log(`   Is overlay on map:`, this.map.hasLayer(overlayLayer));
                 
-                // Ensure the layer is properly added to the map initially
-                if (!this.map.hasLayer(layer)) {
-                    console.log(`🔧 Adding roads layer to map as it wasn't already there`);
-                    layer.addTo(this.map);
+                // Ensure the overlay (group) is added to the map initially if intended
+                if (!this.map.hasLayer(overlayLayer) && layer.visible) {
+                    try {
+                        overlayLayer.addTo(this.map);
+                        console.log('🔧 Added roads overlay to map');
+                    } catch (addErr) {
+                        console.error('❌ Failed to add roads overlay to map:', addErr);
+                    }
                 }
             }
-            
+
             // Update legend when new layer is added
             this.updateLegend();
         } else {
@@ -967,8 +1315,9 @@ class DeltaCountyApp {
             const layerTypes = [
                 {
                     name: '🏞️ Townships',
-                    type: 'line',
+                    type: 'polygon',
                     color: '#2E86AB',
+                    fillColor: '#3498db',
                     layer: this.allowedLayers.townships
                 },
                 {
@@ -982,7 +1331,7 @@ class DeltaCountyApp {
                     name: '🛣️ Road Centerlines',
                     type: 'line',
                     color: '#000000',
-                    layer: this.allowedLayers.roads
+                    layer: this.originalLayers?.roads || this.allowedLayers.Road_Centerlines_Delta_County
                 },
                 {
                     name: '🏠 Address Points',
